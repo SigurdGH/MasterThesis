@@ -1,5 +1,10 @@
+import os
+__PATH = os.path.dirname(os.path.realpath(__file__))
+
 import numpy as np
 import pandas as pd
+
+import pickle
 from sklearn.neural_network import MLPClassifier
 from sklearn import preprocessing
 
@@ -9,6 +14,7 @@ class Predicter():
     """
     def __init__(self):
         self.model = MLPClassifier(solver="adam")
+        self.pickled_model = None
 
 
     def preProcess(self, x=None, y=None, targetCol="Attribute[COL]"):
@@ -124,4 +130,37 @@ class Predicter():
         print(f"Recall: {round(rec, 2)}")
         print(f"F1: {round(2*prec*rec/(prec+rec), 2)}")
         return cm
+
+
+    def saveModel(self, name):
+        """
+        Saves the model to a file.
+
+        Params:
+            name: str, name of file
+        """
+        path = os.path.dirname(os.path.realpath(__file__))
+        file = f"{path}/models/{name}.pkl"
+        try:
+            with open(file, "wb+") as f:
+                pickle.dump(self.model, f)
+                print("Model saved!")
+        except Exception as e:
+            print("Could not save model! ->", e, file)
+    
+    def loadModel(self, name):
+        """
+        Loads a model from a file.
+
+        Params:
+            name: str, name of file
+        """
+        path = os.path.dirname(os.path.realpath(__file__))
+        file = f"{path}/models/{name}.pkl"
+        try:
+            with open(file, "rb") as f:
+                self.pickled_model = pickle.load(f) 
+            print("Model loaded!")
+        except Exception as e:
+            print("Could not load model! ->", e)
 
