@@ -14,6 +14,9 @@ class Predicter():
     """
     def __init__(self):
         self.model = MLPClassifier(solver="adam")
+        self._fitScaler = False
+        self.scaler = preprocessing.StandardScaler()
+        self.numberOfFeatures = 0
         self.pickled_model = None
 
 
@@ -22,7 +25,7 @@ class Predicter():
         Process x and y by transforming to np.array and mean scale x.
         
         Params:
-            x: dataframe
+            x: dataframe or list
             y: dataframe
             targetCol: str, name of column that is to be predicted
         
@@ -40,12 +43,21 @@ class Predicter():
             for c in x.columns:
                 if x[c].dtype != float:
                     x = x.drop(c, axis=1)
+            self.numberOfFeatures = len(x.columns)
             x.loc[x["Attribute[TTC]"]==100000, "Attribute[TTC]"] = -1 # NOTE May be transformed to something else
             x.loc[x["Attribute[DTO]"]==100000, "Attribute[DTO]"] = -1
-            # print(x.columns)
             x = x.to_numpy()
-            scaler = preprocessing.StandardScaler().fit(x) # Scaling the input
-            x = scaler.transform(x)
+            if not self._fitScaler:
+                self.scaler.fit(x) # Fitting the scaler
+                print("Scaler is fitted")
+                self._fitScaler = True
+                x = self.scaler.transform(x) # Scaling the data
+
+        elif isinstance(x, list or np.array): # Used when predicting one input at a time
+            # NOTE Need to make this only accept one row: [[x,x,x,x,x,x]]
+            # Also maybe check if nested and the input has the correct amount of features
+            # if len(x) == self.numberOfFeatures:
+            x = self.scaler.transform([x])
 
         if isinstance(y, pd.DataFrame):
             if targetCol and targetCol in y.columns:
@@ -93,6 +105,7 @@ class Predicter():
         Returns:
             predictions: np.array of 0 and 1
         """
+        # NOTE make it predict only one row, i.e.: [[x,x,x,x,x,x,x,x,x]]
         return self.model.predict(x)
 
 
@@ -143,7 +156,7 @@ class Predicter():
         file = f"{path}/models/{name}.pkl"
         try:
             with open(file, "wb+") as f:
-                pickle.dump(self.model, f)
+                pickle.dump(self.__dict__, f)
                 print("Model saved!")
         except Exception as e:
             print("Could not save model! ->", e, file)
@@ -159,7 +172,7 @@ class Predicter():
         file = f"{path}/models/{name}.pkl"
         try:
             with open(file, "rb") as f:
-                self.pickled_model = pickle.load(f) 
+                self.__dict__ = pickle.load(f) 
             print("Model loaded!")
         except Exception as e:
             print("Could not load model! ->", e)
