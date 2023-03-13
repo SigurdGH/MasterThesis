@@ -47,11 +47,11 @@ class Predicter():
             x.loc[x["Attribute[TTC]"]==100000, "Attribute[TTC]"] = -1 # NOTE May be transformed to something else
             x.loc[x["Attribute[DTO]"]==100000, "Attribute[DTO]"] = -1
             x = x.to_numpy()
-            if not self._fitScaler:
-                self.scaler.fit(x) # Fitting the scaler
+            if not self._fitScaler: # Only fit the scaler once (on training data)
                 print("Scaler is fitted")
+                self.scaler.fit(x) # Fitting the scaler
                 self._fitScaler = True
-                x = self.scaler.transform(x) # Scaling the data
+            x = self.scaler.transform(x) # Scaling the data
 
         elif isinstance(x, list or np.array): # Used when predicting one input at a time
             # NOTE Need to make this only accept one row: [[x,x,x,x,x,x]]
@@ -145,7 +145,7 @@ class Predicter():
         return cm
 
 
-    def saveModel(self, name):
+    def saveModel(self, name, accuracy=None):
         """
         Saves the model to a file.
 
@@ -153,7 +153,7 @@ class Predicter():
             name: str, name of file
         """
         path = os.path.dirname(os.path.realpath(__file__))
-        file = f"{path}/models/{name}.pkl"
+        file = f"{path}/models/{name}.pkl" if not accuracy else f"{path}/models/{name}_{accuracy}.pkl"
         try:
             with open(file, "wb+") as f:
                 pickle.dump(self.__dict__, f)

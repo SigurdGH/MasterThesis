@@ -72,6 +72,13 @@ class DataManipulation():
 
         return trainX, trainY, testX, testY
 
+    def underSample(self, sampleSize: int=1000):
+        self._data = pd.concat([self._data[self._data["Attribute[COL]"] == False].sample(sampleSize), self._data[self._data["Attribute[COL]"] == True]])
+    
+    def overSample(self, sampleSize: int=1000):
+        colition_df = self._data[self._data["Attribute[COL]"] == True]
+        # add more samples to the collision data (duplicate)
+        self._data = pd.concat([self._data, colition_df.sample(sampleSize, replace=True)])
 
     def getCompleteRow(self, index: None):
         """
