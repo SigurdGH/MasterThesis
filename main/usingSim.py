@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from copy import copy
 from ML.Model import Predicter
+from threading import Thread
 
 # TODO
 # Seems like positions are wrong when loading files to the scenariorunner.
@@ -49,6 +50,8 @@ def fromScenario(filename: str="", mode: int=0):
 def plotData(s, a, j, p, duration, interval, dto):
     x = [i for i in range(len(s))]
 
+    # print(len(s), len(a), len(j), len(p), duration, interval, len(dto))
+
     plt.figure(figsize=(12, 5))
 
     plt.subplot(121)
@@ -79,7 +82,7 @@ class P():
         self.model.loadModel(filename)
         self.translate = {1: "You are going to crash!", 0: "Not crashing!"}
 
-    def predict(self, ttc=20, dto=20, jerk=0, speeds=[0,0,0,0,0,0]):
+    def predict(self, ttc=20, dto=20, jerk=0, speeds=[0,0,0,0,0,0], angular=[]):
         """
         Used to predict: [TTC, DTO, Jerk, road, scenario, speed1, speed2, speed3, speed4, speed5, speed6]
 
@@ -95,7 +98,11 @@ class P():
 
         """
         # x = np.array([20, 20, 1, 2, 1,1,2,3,4,5,6])
-        x = [ttc, dto, jerk] + speeds
+        if len(angular) < 6:
+            x = [ttc, dto, jerk] + speeds
+        else:
+            x = [ttc, dto, jerk] + speeds + np.array(angular).flatten().tolist()
+        # print(f"Inne i predict: {x}")
         xP, _ = self.model.preProcess(x)
         # print(f"x: {x}\t\tprocessed: {xP[0]}")
         prediction = self.model.predict(xP)[0]
@@ -249,9 +256,11 @@ class Simulation():
         self.isColliding(lastCollision, timeRan, predictions[-1], predictions[-2])
         """
         if now-lastCollision > 5:
+            self.controls.braking = 0
             self.controls.turn_signal_left = False
             self.controls.turn_signal_right = False
         else:
+            self.controls.braking = 1
             self.controls.turn_signal_left = True
             self.controls.turn_signal_right = True
 
@@ -290,7 +299,8 @@ class Simulation():
         
         # self.changeTimeAndWeather(time=15, rain=0.4, fog=0.6, damage=0.2)
         self.changeScenario("sunny_night")
-
+        # self.spawnNPCVehicle("Sedan", 10, speed=0)
+        # self.spawnNPCVehicle("SchoolBus", 10, -10)
         # self.spawnNPCVehicle("BoxTruck", 20, speed=0)
         # self.spawnNPCVehicle("Sedan", 20, -3,speed=22)
         # self.otherAgents[0].follow_closest_lane(True, 5)
@@ -311,39 +321,91 @@ class Simulation():
         acceleration = [0]
         jerk = [0]
         predictions = [0] * int(5 // updateInterval)
+        
+        angular = [[0,0,0]]
 
         pred = P("Classifier")
+        # pred = P("MLPClassifier_1952-26-51-181") # ttc, dto, jerk, speed1-6, a1x, a1y, a1z, a2x...
+
+
+        # def forThreading(ttc, jerk, speeds):
+        #     self.getDTOs()
+        #     dtoList.append(self.distanceToObjects[0]-4.77)
+        #     predictions.append(pred.predict(ttc, dtoList[-1], jerk, speeds))
+
+        #     if predictions[-1] and predictions[-1] != predictions[-2]:
+        #         lastCollision = timeRan
+        #     self.isColliding(lastCollision, timeRan)
 
         oldControls = copy(self.controls.__dict__)
         self.ego.apply_control(self.controls, True)
+        # t = None
+        notSaved = False
         while True:
+            
             self.sim.run(updateInterval)
             timeRan += updateInterval
+
+            # if timeRan > 1 and not notSaved:
+            #     notSaved = True
+            #     for sensor in self.ego.get_sensors():
+            #         # print(sensor.name, end=", ")
+            #         # print(sensor.__dict__)
+            #         # print(sensor.enabled)
+            #         if sensor.name == "Lidar":
+            #             print("Saving lidar")
+            #             sensor.save("C:/MasterFiles/MasterThesis/data/lidar2.pcd")
+            #             print(f"min_distance: {sensor.min_distance}")
+            #             print(f"max_distance: {sensor.max_distance}")
+            #             print(f"rays: {sensor.rays}")
+            #             print(f"rotations: {sensor.rotations}") # rotation frequency, Hz
+            #             print(f"measurements: {sensor.measurements}") # = j["measurements"]  # how many measurements each ray does per one rotation
+            #             print(f"fov: {sensor.fov}")
+            #             print(f"angle: {sensor.angle}")
+            #             print(f"compensated: {sensor.compensated}")
+
+
+
+            # if isinstance(t, Thread):
+            #     t.join()
+            # t = Thread(target=self.sim.run, args=updateInterval)
+            # t.start()
+
             self.getDTOs()
 
+            # print(f"Angular velocity: x: {self.ego.state.angular_velocity.x},  y: {self.ego.state.angular_velocity.y},  z: {self.ego.state.angular_velocity.z}")
+            ##
             dtoList.append(self.distanceToObjects[0]-4.77) # NOTE 4.77 is probably the distance between a position and length of a vehicle
             speed = self.ego.state.speed
             speeds.append(round(speed, 3))
             acceleration.append((speeds[-1]-speeds[-2])/updateInterval)
             jerk.append((acceleration[-1]-acceleration[-2])/updateInterval)
-            
+
+            # Angular
+            angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
+
             # print(f"Speed: {round(speeds[-1], 2)} m/s")
             # print(f"Acceleration: {round(acceleration[-1], 2)} m/s^2")
             # print(f"Jerk: {round(jerk[-1], 2)} m/s^3")
             # print(self.distanceToObjects[0], 5 // updateInterval)
             if len(speeds) > 5 // updateInterval:
-                predictions.append(pred.predict(dto=dtoList[-1], speeds=speeds[-(6*intsPerSec)::intsPerSec], jerk=np.average(jerk[-(6):])))
-
+                # t = Thread(target=forThreading, args=(20, np.average(jerk[-(6):]), speeds[-(6*intsPerSec)::intsPerSec]))
+                # t.start()
+                predictions.append(pred.predict(dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec]))
+                # predictions.append(pred.predict(dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
+            
             # NOTE: can maybe make it more abstract
             if predictions[-1] and predictions[-1] != predictions[-2]:
                 lastCollision = timeRan
             self.isColliding(lastCollision, timeRan)#, predictions[-1], predictions[-2])
-
+            
             if self.controls.__dict__ != oldControls: # Only applies new controls if something has changed
                 oldControls = copy(self.controls.__dict__)
                 self.ego.apply_control(self.controls, True)
-                
+
             if timeRan > simDuration:
+                # if isinstance(t, Thread):
+                #     t.join()
                 self.sim.stop()
                 break
 
@@ -355,7 +417,7 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     
     sim = Simulation("sf")
-    sim.runSimulation(30, 0.5)
+    sim.runSimulation(20, 1)
     # plotData(s,a,j)
 
 
