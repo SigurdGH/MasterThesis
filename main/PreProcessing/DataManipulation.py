@@ -22,6 +22,15 @@ class DataManipulation():
     def data(self):
         return self._data
 
+    def ExtractAvData(self):
+        # we have 6 columns av1, ..., av6, containing a list of angular velocities (x,y,z). want to split each av into 3 columns, exp. av1x, av1y, av1z, av2x, av2y ...
+        av = ["av" + str(i) for i in range(1,7)]
+        av_ = [f"{col}{av}" for col in av for av in ["x", "y", "z"]] # av1x, av1y, av1z, av2x ...
+
+        angular_velocities = self._data[av].apply(lambda x: list(map(float, sum(map(lambda y: y.strip("[]").split(","), x.values), []))), axis=1)
+        self._data[av_] = angular_velocities.values.tolist()
+        self._data = self._data.drop(av, axis=1)
+                
 
     def addFromXML(self, filename: str="") -> None:
         """
@@ -36,6 +45,7 @@ class DataManipulation():
             raise FileNotFoundError(f"The file does not exist.")
         if isinstance(self.data, pd.DataFrame):
             self._data = self.data.merge(xmlDf, how="inner", on=["ScenarioID", "road", "reward", "scenario", "strategy"], copy=False)
+            self.ExtractAvData()
         else:
             print("Something went wrong in 'addFromXML()'!")
 
