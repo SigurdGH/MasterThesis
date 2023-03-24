@@ -44,7 +44,6 @@ class Predicter():
                 if x[c].dtype != float:
                     x = x.drop(c, axis=1)
             self.numberOfFeatures = len(x.columns)
-            x.loc[x["Attribute[TTC]"]==100000, "Attribute[TTC]"] = -1 # NOTE May be transformed to something else
             x.loc[x["Attribute[DTO]"]==100000, "Attribute[DTO]"] = -1
             x = x.to_numpy()
             if not self._fitScaler: # Only fit the scaler once (on training data)
