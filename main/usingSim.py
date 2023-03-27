@@ -241,7 +241,7 @@ class Simulation():
         A simple scenario where a sedan spawns 20 meters in front of the ego vehicle with a set speed and the ego is cathing up.
         The ego vehicle is going to crash into it after some seconds.
         """
-        self.spawnNPCVehicle("Sedan", 20, 0.5, 8)
+        self.spawnNPCVehicle("Sedan", 20, 0.5, 8, True)
         self.controls.throttle = 0.5
 
 
@@ -290,7 +290,7 @@ class Simulation():
         """
         ttc = 100000
         # dist/speed
-        print(f"distance prev: {previousDistance}, currentDistance: {currentDistance}")
+        # print(f"distance prev: {previousDistance}, currentDistance: {currentDistance}")
         if currentDistance < 100 and currentSpeed > 1:
             # print("MINDEREFJKSNKFLCB", end="")
             ttc = currentDistance / currentSpeed
@@ -326,9 +326,9 @@ class Simulation():
         self.changeScenario("sunny_night")
         if not driveWithKB:
             print("starting simulation...")
-            # self.simpleScenario()
+            self.simpleScenario()
             # self.controls.throttle = 0.2
-            self.spawnNPCVehicle("Sedan", 30, 0.5, 0, True)
+            # self.spawnNPCVehicle("Sedan", 30, 0.5, 0, True)
         else:
             print("Driving with keyboard!")
             self.spawnNPCVehicle("Sedan", 50, 0.5, 0)
@@ -379,7 +379,7 @@ class Simulation():
 
             ttcList.append(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval))
             # print(f"TTC: {round(ttcList[-1], 2)} \t Time: {round(self.sim.current_time, 1)} \t Throttle: {round(self.controls.throttle, 1)}")
-            print(f"TTC: {round(ttcList[-1], 2)} \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):], 2))}\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)}")
+            print(f"TTC: {round(ttcList[-1], 2)} \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)}\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)}")
             # Evasive action
             # if dtoList[-1] < 15:
             #     evasive = lidar.getEvasiveAction()
@@ -401,7 +401,7 @@ class Simulation():
                 lastCollision = timeRan
 
             # Turns on hazards and brakes
-            # self.isColliding(lastCollision, timeRan)
+            self.isColliding(lastCollision, timeRan)
 
             # Only applies new controls if something has changed
             if self.controls.__dict__ != oldControls and not driveWithKB:
@@ -420,7 +420,7 @@ class Simulation():
 if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
-    sim.runSimulation(10, 1)
+    sim.runSimulation(30, 0.2)
     # plotData(s,a,j)
 
 
