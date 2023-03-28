@@ -1,25 +1,18 @@
 import os
-__PATH = os.path.dirname(os.path.realpath(__file__))
-
 import numpy as np
 import pandas as pd
-
 import pickle
+
+from sklearn.preprocessing import StandardScaler, LabelEncoder, LabelBinarizer
 from sklearn.neural_network import MLPClassifier
-from sklearn import preprocessing
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 
-class Predicter():
-    """
-    NOTE: Should try other models and should do something about TTC, some are < 15, many are 100000.
-    """
-    def __init__(self, model=None):
-        self.model = MLPClassifier(solver="adam") if model is None else model
+class DTPredictor():
+    def __init__(self, model=MLPClassifier(solver="adam")):
+        self.model = model
+        self.scaler = StandardScaler()
         self._fitScaler = False
-        self.scaler = preprocessing.StandardScaler()
-        self.numberOfFeatures = 0
-        self.pickled_model = None
-
-
+    
     def preProcess(self, x=None, y=None, targetCol="Attribute[COL]"):
         """
         Process x and y by transforming to np.array and mean scale x.
@@ -33,7 +26,6 @@ class Predicter():
             x: np.array
             y: np.array
         """
-
         if isinstance(x, pd.DataFrame):
 
             # label encode road and scenario
@@ -43,12 +35,12 @@ class Predicter():
             for c in x.columns:
                 if x[c].dtype != float:
                     x = x.drop(c, axis=1)
-            self.numberOfFeatures = len(x.columns)
             x.loc[x["Attribute[DTO]"]==100000, "Attribute[DTO]"] = -1
             x = x.to_numpy()
+
             if not self._fitScaler: # Only fit the scaler once (on training data)
-                print("Scaler is fitted")
                 self.scaler.fit(x) # Fitting the scaler
+                print("Scaler is fitted")
                 self._fitScaler = True
             x = self.scaler.transform(x) # Scaling the data
 
@@ -56,6 +48,8 @@ class Predicter():
             # NOTE Need to make this only accept one row: [[x,x,x,x,x,x]]
             # Also maybe check if nested and the input has the correct amount of features
             # if len(x) == self.numberOfFeatures:
+            if not self._fitScaler:
+                x = self.scaler.fit_transform([x])
             x = self.scaler.transform([x])
 
         if isinstance(y, pd.DataFrame):
@@ -68,7 +62,7 @@ class Predicter():
                 print("Wrong parameters was sent in!")
         
         return x, y
-
+    
     def labelEncode(self, x: pd.DataFrame, cols: list[str] = ["road", "scenario"]):
         """
         Label encoding for cols, default is road and scenario.
@@ -80,77 +74,25 @@ class Predicter():
         Returns:
             x: Dataframe
         """
-        x[cols] = x[cols].apply(preprocessing.LabelEncoder().fit_transform)
+        x[cols] = x[cols].apply(LabelEncoder().fit_transform)
         return x
-        
-        
 
     def fit(self, x, y):
-        """
-        Train the model.
-
-        Params:
-            x: np.array, preprocessed training data
-            y: np.array, preprocessed training truth
-        """
         self.model.fit(x, y)
-
-
+    
     def predict(self, x):
-        """
-        Params:
-            x: Dataframe, what to predict
-
-        Returns:
-            predictions: np.array of 0 and 1
-        """
-        # NOTE make it predict only one row, i.e.: [[x,x,x,x,x,x,x,x,x]]
         return self.model.predict(x)
 
-
-    def getScore(self, predictions, truth):
-        """"
-        Shows the score of given predictions and ground truth in a confusion matrix.
-        
-        Prints as follows:
-            True negative | False positive
-
-            False negative | True positive
-
-        Params:
-            predictions: np.array
-            truth: np.array
-        
-        Returns:
-            cm: list[list]
-        """
-        _, truthProcessed = self.preProcess(y=truth)
-        tot = 0
-        cm = [[0, 0], [0, 0]]
-        col = np.count_nonzero(truthProcessed == 1)
-        
-        for p, t in zip(predictions, truthProcessed):
-            cm[t][p] += 1
-            tot += 1
-
-        prec = cm[1][1]/(cm[0][1]+cm[1][1])
-        rec = cm[1][1]/(cm[1][1]+cm[1][0])
-        print(f"Total: {tot}, number of collisions: {col}")
-        print(f"\tTN: {cm[0][0]} \t| FP: {cm[0][1]} \n\tFN: {cm[1][0]} \t| TP: {cm[1][1]}")
-        print(f"Accuracy: {round((cm[0][0]+cm[1][1])/(cm[0][0]+cm[0][1]+cm[1][0]+cm[1][1]), 2)}")
-        print(f"Precision: {round(prec, 2)}")
-        print(f"Recall: {round(rec, 2)}")
-        print(f"F1: {round(2*prec*rec/(prec+rec), 2)}")
+    def getScore(self, y, y_pred):
+        acc, prec, rec, f1 = accuracy_score(y, y_pred), precision_score(y, y_pred), recall_score(y, y_pred), f1_score(y, y_pred)
+        cm = confusion_matrix(y, y_pred)
+        print(f"Total: {len(y)}, Collisions: {np.count_nonzero(y)}")
+        print(f"Accuracy: {acc}, Precision: {prec}, Recall: {rec}, F1: {f1}")
+        print("Confusion matrix:")
+        print(cm)
         return cm
-
-
-    def saveModel(self, name, accuracy=None):
-        """
-        Saves the model to a file.
-
-        Params:
-            name: str, name of file
-        """
+    
+    def saveModel(self, name, accuracy):
         path = os.path.dirname(os.path.realpath(__file__))
         file = f"{path}/models/{name}.pkl" if not accuracy else f"{path}/models/{name}_{accuracy}.pkl"
         try:
@@ -159,7 +101,7 @@ class Predicter():
                 print("Model saved!")
         except Exception as e:
             print("Could not save model! ->", e, file)
-    
+
     def loadModel(self, name):
         """
         Loads a model from a file.
@@ -175,4 +117,3 @@ class Predicter():
             print("Model loaded!")
         except Exception as e:
             print("Could not load model! ->", e)
-
