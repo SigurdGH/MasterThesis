@@ -41,20 +41,15 @@ class DataManipulation():
         SAC = "Attribute[SAC]"
         speeds = [f"speed{i}" for i in range(1,7)]
 
-        d = []
         for idx, row in self._data.loc[self._data["Attribute[COL]"] == True].iterrows():
             _sac = row[SAC]
             for speed_idx, speed in enumerate(speeds):
                 if speed_idx + 1 == len(speeds):
                     break
                 if _sac >= row[speed] and _sac <= row[speeds[speed_idx+1]]:
-                    d.append(idx)
-                    # randval = 
-                    # res.loc[idx, speeds[speed_idx:]] = [row[speed] + randval for _ in range(speed_idx, len(speeds))]
                     prev = res.loc[idx, speeds[speed_idx:]].values.tolist()
                     res.loc[idx, speeds] = [prev[0] + random.uniform(-1, row[speed] / 10) for _ in range(0, len(speeds)- len(prev))] + prev
                     break
-        print(d)
         self._data = res
 
     def addFromXML(self, filename: str="") -> None:

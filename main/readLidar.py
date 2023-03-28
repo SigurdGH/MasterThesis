@@ -170,9 +170,7 @@ class ReadLidar():
 
 
 if __name__ == "__main__":
-    # lidar = ReadLidar(window=0.5, rays=20, filename=".\MasterThesis\data\\album\lidar8.pcd")
-    lidar = ReadLidar(window=3, rays=35)
-    # lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
+    lidar = ReadLidar(window=0, rays=20, filename="../data/lidar/lidar10mSedan.pcd")
     lidar.readPCD()
 
     lidar.getPointsInFront()
