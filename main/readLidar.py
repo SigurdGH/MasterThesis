@@ -6,18 +6,20 @@ import time
 
 
 class ReadLidar():
-    def __init__(self, window=0, rays=20, filename="../data/lidar.pcd"):
+    def __init__(self, window=0., rays=20, filename="../data/lidar.pcd"):
         """
         Get distance to objects by using a .pcd file.
         ### Params:
-            * window: int, extra points right/left for the points in front of the vehicle.
+            * window: float, how many meters left/right of the center the algorithm looks for objects in front of the vehicle.
             * rays: int, how many rays the algorithm searches for an obect, more = longer reach, max 32(?)
             * filename: str, name of the .pcd file that keeps being reuploaded during simulation
         """
         self.mid = 180
-        self.window = window
+        self.vehicleHeight = 0.2
+        self.window = window if window > 0 else 0.1
         self.rays = rays if rays < 32 else 32
         self.indexes = np.arange(360*rays)
+        self.closestPointInFront = None
 
         self.vectorList = None
         self.inFront = None
@@ -66,8 +68,9 @@ class ReadLidar():
         Store only the points that are in front of the vehicle +/- the window size.
         """
         # self.inFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid-self.window and i % 360 <= self.mid+self.window])
-        self.inFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid and i % 360 <= self.mid])
+        # self.inFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid and i % 360 <= self.mid])
         # print(len(self.inFront))
+        self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 0 and y > -self.window and y < self.window])
 
 
     def getDistanceToObstacle(self):
@@ -87,11 +90,14 @@ class ReadLidar():
 
         TODO: See at other points as well that are not directly in front.
         """
-        for x, y, z in self.inFront[2:]: # Skips first two rays, as the readings are from hitting the EGO vehicle
+        self.closestPointInFront = (100,0,-1)
+        for x, y, z in self.inFront:
             # print(x, y, z)
-            if z > -2.1:
+            if z > -2.1 and z < self.vehicleHeight and np.sqrt(x**2+y**2) < np.sqrt(self.closestPointInFront[0]**2+self.closestPointInFront[1]**2):
                 # print(x)
-                return round(x-2.87, 4)
+                self.closestPointInFront = (x, y, z)
+        # return self.closestPointInFront
+        return round(np.sqrt((self.closestPointInFront[0] - 2.87)**2+self.closestPointInFront[1]**2), 4)
         return 100
     
 
@@ -110,28 +116,29 @@ class ReadLidar():
             * int: -1 or 1, suggests turning right if -1 or left if 1
         """
         # directlyInFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid and i % 360 <= self.mid])
-        # win = 5
         distances = None
-        for ray, (x, y, z) in enumerate(self.inFront[2:], 2): # Skips first two rays, as the readings are from hitting the EGO vehicle
-            # print(x, y, z)
-            if z > -2.1:
+        for index, (x, y, z) in enumerate(np.array([point for point in self.vectorList[720:360*self.rays]]), 720):
+            if x > 0 and y > -self.window and y < self.window and z > -2.1 and z < self.vehicleHeight and (x, y, z) == self.closestPointInFront:
+                # print(x, y, z)
+                # if z > -2.1:
                 # print("hei")
                 # print(x, round(x-2.87, 4))
                 # print(ray, ray*360+self.mid-width, ray*360+self.mid+width)
-                if distances is None:
-                    distances = self.vectorList[ray*360+self.mid-width: ray*360+self.mid+width+1]
-                    # print(distances)
+                # if distances is None:
+                distances = self.vectorList[index-width: index+width+1]
+                break
 
         highestDiff = 0
         indexHighestDiff = 0
         # print(0, distances[0])
         for i, (x, y, z) in enumerate(distances[1:], 1):
-            # print(i, x, y, z, end=": \t")
+            # print(i, x, y, z, end=": \n")
             distToPrevious = np.sqrt(distances[i-1][0]**2+distances[i-1][1]**2) - np.sqrt(distances[i][0]**2+distances[i][1]**2)
             # print(f"DistToPrevious: {round(distToPrevious, 3)}")
             highestDiff, indexHighestDiff = (distToPrevious, i) if np.absolute(distToPrevious) > np.absolute(highestDiff) else (highestDiff, indexHighestDiff)
-        print(f"\t\tindex: {indexHighestDiff}, highestDiff: {highestDiff}")
+        # print(f"\t\tindex: {indexHighestDiff}, highestDiff: {highestDiff}, {1 if highestDiff >= 0 else -1}")
         return 1 if highestDiff >= 0 else -1
+        return distances
 
 
     @property
@@ -145,45 +152,31 @@ class ReadLidar():
 
 
 if __name__ == "__main__":
-    lidar = ReadLidar(window=0, rays=20, filename=".\MasterThesis\data\lidar\lidar10mSedan.pcd")
+    # lidar = ReadLidar(window=0.5, rays=20, filename=".\MasterThesis\data\\album\lidar8.pcd")
+    lidar = ReadLidar(window=1, rays=35, filename=".\MasterThesis\data\lidar\lidar10mSedan.pcd")
+    # lidar = ReadLidar(window=1, rays=35, filename=".\MasterThesis\data\lidar\lidarNoCars.pcd")
     lidar.readPCD()
 
     lidar.getPointsInFront()
-    print(lidar.getDistanceToObstacle(), lidar.getDistanceToObstacle()+2.87)
     # print(lidar.inFront)
-    # print(lidar.inFront[2:])
+    # lidar.vizualizePointCloud(lidar.vectorList)
+    closest = lidar.getDistanceToObstacle()
+    print(lidar.getDistanceToObstacle())#, np.sqrt(closest[0]**2+closest[1]**2))
+    # print(lidar.inFront)
+    # print(lidar.updatedDTO)
     evasive = lidar.getEvasiveAction(10)
     print(evasive)
-    # lidar.vizualizePointCloud(np.vstack([evasive, lidar.inFront]))
 
+    # l= lidar.test()
+    # print(l)
+    # lidar.vizualizePointCloud(np.vstack([lidar.inFront, lidar.vectorList[:360*1]]))
+    # lidar.vizualizePointCloud(np.vstack([lidar.inFront, evasive]))
 
-    # lidar.vizualizePointCloud(lidar.inFront)
-    
-    # dist = ["0", "5", "10", "20", "30", "40"]
-    # lidarDistances = []
-    # for d in dist:
-    #     print(f"Spawn {d} m in front")
-    #     # input(f"NPC spawned {d} m in front of EGO vehicle.\\ Press enter for visualization:")
-    #     lidar2 = ReadLidar(window=5, rays=10, filename=f".\MasterThesis\data\lidar\lidar{d}mSedan.pcd")
-    #     lidar2.readPCD()
-
-    #     lidar2.getPointsInFront()
-    #     print(lidar2.getDistanceToObstacle())
-    #     lidarDistances.append((int(d), lidar2.updatedDTO))
-    #     print(lidar2.inFront)
-        
-    #     lidar2.vizualizePointCloud(lidar2.inFront)
-    #     break
-    # print(lidarDistances)
-
-    # start = time.time()
-    # lidar.readPCD()
-    # print(lidar.updatedDTO)
-    # lidar.getPointsInFront()
-    # print(lidar.getDistanceToObstacle())
-    # print(f"Time used: {time.time() - start}")
-    # lidar.vizualizePointCloud(lidar.inFront)
+    # for i in range(5,10):
+    #     lidar = ReadLidar(window=0, rays=35, filename=f".\MasterThesis\data\\album\lidar{i}.pcd")
+    #     lidar.readPCD()
+    #     lidar.getPointsInFront()
+    #     # print(lidar.updatedDTO)
+    #     lidar.vizualizePointCloud(np.vstack([lidar.inFront, lidar.vectorList[:360*1]]))
 
         
-
-

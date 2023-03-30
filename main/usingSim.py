@@ -11,11 +11,9 @@ from time import time
 # TODO
 # Seems like positions are wrong when loading files to the scenariorunner.
 # Possibly make something to transform the positions.
-# Could maybe use 'easting' and 'northing' to get presice locations from xml
+# Could maybe use 'easting' and 'northing' to get precise locations from xml
 
 # TODO
-# * Maybe use something else to get DTO
-#     Also check if NPC is in front of EGO
 # * Maybe use absolute value in stead of average jerk
 
 
@@ -70,7 +68,7 @@ def plotData(s, a, j, p, duration, interval, dto, ttc):
     plt.plot(x, s, "-", label="Speed (m/s)")
     plt.plot(x, [i*10 for i in p], "-r", label="Predicted collision (0 or 10)")
     plt.plot(x, dto, "--", label="DTO (m)")
-    plt.plot(x, ttc, "-*", label="TTC (s)")
+    plt.plot(x, ttc, "-", label="TTC (s)")
     plt.xlabel(f"Time, delta = {interval} s, duration = {duration} s")
     plt.legend()
     plt.grid()
@@ -205,7 +203,7 @@ class Simulation():
         self.changeTimeAndWeather(time=scenarios[scenario]["time"], rain=scenarios[scenario]["rain"])
 
 
-    def spawnNPCVehicle(self, vehicle: str="Sedan", front: int=10, side: int=0, speed: int=0, followLane: bool=False):
+    def spawnNPCVehicle(self, vehicle: str="Sedan", front: int=10, side: int=0, rotation: int=0, speed: int=0, followLane: bool=False):
         """
         Spawn an NPC car that will follow the closest lane.
         Also stops for traffic lights.
@@ -214,6 +212,7 @@ class Simulation():
             * vehicle: str, which vehicle to spawn (Sedan, SUV, Jeep, Hatchback, SchoolBus, BoxTruck)
             * front: int, how many meters the NPC will spawn in front of the EGO vehicle
             * side: int, how many meters the NPC will spawn to the right of the EGO vehicle
+            * rotation: int, how many degress the NPC will rotate in regards to the EGO vehicle
             * speed: int, set the speed (m/s) of the NPC
         """
         vehicles = ["Sedan", "SUV", "Jeep", "Hatchback", "SchoolBus", "BoxTruck"]
@@ -226,6 +225,7 @@ class Simulation():
         forward = lgsvl.utils.transform_to_forward(self.spawns[0])
         right = lgsvl.utils.transform_to_right(self.spawns[0])
         state.transform.position = self.spawns[0].position + front * forward + side * right
+        self.spawns[0].rotation.y += rotation
         state.transform.rotation = self.spawns[0].rotation
         
         npc = self.sim.add_agent(vehicle, lgsvl.AgentType.NPC, state)
@@ -236,13 +236,48 @@ class Simulation():
         self.distanceToObjects.append(100000)
 
 
-    def simpleScenario(self):
+    def useScenario(self, scene=1):
         """
+        Different scenarios for simulating.\\
+        ### Scene = 1:
         A simple scenario where a sedan spawns 20 meters in front of the ego vehicle with a set speed and the ego is cathing up.
         The ego vehicle is going to crash into it after some seconds.
+
         """
-        self.spawnNPCVehicle("Sedan", 20, 0.5, 8, True)
-        self.controls.throttle = 0.5
+        print(f"Running scene number {scene}!")
+        if scene == 1: # Car driving in front
+            self.spawnNPCVehicle("Sedan", 20, 0.5, 0, 8, True)
+            self.controls.throttle = 0.5
+        if scene == 2: # Lane change
+            self.spawnNPCVehicle("Sedan", -5, -3, 0, 8, True)
+            # self.otherAgents[0].follow_closest_lane(0,5,isLaneChange=False)
+            forward = lgsvl.utils.transform_to_forward(self.spawns[0])
+            right = lgsvl.utils.transform_to_right(self.spawns[0])
+            # pos = self.spawns[0].position + front * forward + side * right
+            rot = self.spawns[0].rotation
+            waypoints = [
+                lgsvl.DriveWaypoint(position=self.spawns[0].position + 10 * forward - 3 * right, speed=5, angle=rot),
+                lgsvl.DriveWaypoint(position=self.spawns[0].position + 30 * forward - 3 * right, speed=5, angle=rot),
+                # lgsvl.DriveWaypoint(position=self.spawns[0].position + 15 * forward + 0 * right, speed=5, angle=rot, idle=1),
+                # lgsvl.DriveWaypoint(position=self.spawns[0].position + 0 * forward - 5 * right, speed=5, angle=rot, idle=1),
+                # lgsvl.DriveWaypoint(lgsvl.Vector(1,0,5), 5, lgsvl.Vector(0, 0, 0), 0, False, 0),
+                ]
+            self.otherAgents[0].follow(waypoints, loop=False)
+            self.otherAgents[0].on_waypoint_reached(self.onReach)
+            # self.otherAgents[0].change_lane(False)
+            self.controls.throttle = 0
+
+
+    def onReach(self, agent, index):
+        """
+        Used by an NPC when a waypoint is reched.\\
+        NPC.on_waypoint_reached(self.onReach)
+        """
+        # print(agent)
+        print(f"Reached waypoint {index}")
+        # print(args)
+        # agent.change_lane(False)
+        # self.otherAgents[0].change_lane(False)
 
 
     def isColliding(self, lastCollision: float=0.0, now: float=0.0):
@@ -292,7 +327,6 @@ class Simulation():
         # dist/speed
         # print(f"distance prev: {previousDistance}, currentDistance: {currentDistance}")
         if currentDistance < 100 and currentSpeed > 1:
-            # print("MINDEREFJKSNKFLCB", end="")
             ttc = currentDistance / currentSpeed
             # print(ttc)
         
@@ -300,16 +334,19 @@ class Simulation():
         return ttc
 
 
-    def runSimulation(self, simDuration: float=10, updateInterval: float=1, plotting: bool=True):
+    def runSimulation(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, model: str="Classifier", driveWithKB: bool=True, plotting: bool=True):
         """
-        Run simulation in LGSVL (OSSDC-SIM).
+        Run a simulation in LGSVL (OSSDC-SIM).
 
         ### Params:
             * simDuration: float, time (seconds) for simulation duration
             * updateInterval: float, time (seconds) between each data logging
+            * window: float, distance left/right the algorithm should look for obstacles
+            * model: str, which model the predicter class should use
+            * driveWithKB: bool, if the car can be driven with the keyboard
             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
         """        
-        # Variables
+        ### Variables
         ttcList = [0]
         dtoList = [0]
         speeds = [0]
@@ -319,23 +356,21 @@ class Simulation():
         angular = [[0,0,0]]
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
-        # evasiveDict = {1: -1, -}
         
-        # Scenarios
-        driveWithKB = True
+        ### Scenarios
         self.changeScenario("sunny_night")
         if not driveWithKB:
             print("starting simulation...")
-            self.simpleScenario()
+            self.useScenario(scene=2)
             # self.controls.throttle = 0.2
             # self.spawnNPCVehicle("Sedan", 30, 0.5, 0, True)
         else:
             print("Driving with keyboard!")
             self.spawnNPCVehicle("Sedan", 50, 0.5, 0)
         
-        # Classes
-        pred = P("Classifier")
-        lidar = ReadLidar(0, 35, ".\MasterThesis\data\lidarUpdate.pcd")
+        ### Classes
+        pred = P(model)
+        lidar = ReadLidar(window, 35, ".\MasterThesis\data\lidarUpdate.pcd")
 
         intsPerSec = int(1//updateInterval)
         print(f"Updating {intsPerSec} times per second!")
@@ -344,18 +379,14 @@ class Simulation():
         self.controls.headlights = 0
         self.ego.apply_control(self.controls, False)
         while True:
-            # print(self.controls.__dict__)
             self.sim.run(updateInterval)
             timeRan += updateInterval
-            self.getDTOs()
             for sensor in self.ego.get_sensors(): # maybe use __dict__ to get to the sensor immediately
                 if sensor.name == "Lidar":
                     sensor.save("C:/MasterFiles/MasterThesis/data/lidarUpdate.pcd")
                     distance = lidar.updatedDTO
-                    # if distance < 7:
-                    #     sensor.save("C:/MasterFiles/MasterThesis/data/lidar/lidarSkewed.pcd")
                     # print(f"Lidar: {round(distance, 3)} m, speed: {round(self.ego.state.speed, 3)} m/s", end="\t")
-                    # , from coordinates: {round(self.distanceToObjects[-1], 3)}, diff: {round(round(distance, 2)-round(self.distanceToObjects[-1], 2), 3)}
+                    # from coordinates: {round(self.distanceToObjects[-1], 3)}, diff: {round(round(distance, 2)-round(self.distanceToObjects[-1], 2), 3)}
                     dtoList.append(distance)
                     break
             # Maybe use this to check distances in comparison with the lidar
@@ -365,48 +396,48 @@ class Simulation():
             acceleration.append((speeds[-1]-speeds[-2])/updateInterval)
             jerk.append((acceleration[-1]-acceleration[-2])/updateInterval)
 
-            # Angular
+            ### Angular
             angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
 
-            # Cruise controll
-            targetSpeed = 5
-            if speed-targetSpeed > 0.5: # Drives too fast
-                self.controls.throttle -= 0.2 if self.controls.throttle >= 0.2 else 0
-            elif speed-targetSpeed < 0.5: # Drives too slow
-                self.controls.throttle += 0.2 if self.controls.throttle <= 0.8 else 0
-            else:
-                self.controls.throttle = 0
+            ### Cruise controll
+            # targetSpeed = 5
+            # if speed-targetSpeed > 0.5: # Drives too fast
+            #     self.controls.throttle -= 0.2 if self.controls.throttle >= 0.2 else 0
+            # elif speed-targetSpeed < 0.5: # Drives too slow
+            #     self.controls.throttle += 0.2 if self.controls.throttle <= 0.8 else 0
+            # else:
+            #     self.controls.throttle = 0
 
             ttcList.append(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval))
             # print(f"TTC: {round(ttcList[-1], 2)} \t Time: {round(self.sim.current_time, 1)} \t Throttle: {round(self.controls.throttle, 1)}")
-            print(f"TTC: {round(ttcList[-1], 2)} \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)}\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)}")
-            # Evasive action
+            print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
+            
+            ### Evasive action
             # if dtoList[-1] < 15:
             #     evasive = lidar.getEvasiveAction()
             #     evasiveDict = {1: "LEFT", -1: "RIGHT"}
-            #     print(f"Turni {evasiveDict[evasive]} to avoid a potential collision!")
-            #     self.controls.steering = -evasive/4
-            #     # self.controls.braking = 1
+            #     print(f"Turn {evasiveDict[evasive]} to avoid a potential collision!")
+                # self.controls.steering = -evasive/4
+                # self.controls.braking = 1
             # else:
             #     self.controls.steering = 0
 
-            # Starts the collision prediction
+            ### Starts the collision prediction
             if len(speeds) > 5 // updateInterval:
                 predictions.append(pred.predict(ttc=ttcList[-1], dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec]))
                 # predictions.append(pred.predict(dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
             
-            # Check if a collision has been predicted
+            ### Check if a collision has been predicted
             if predictions[-1] and predictions[-1] != predictions[-2]:
                 print("A COLLISION IS GOING TO HAPPEN!")
                 lastCollision = timeRan
 
-            # Turns on hazards and brakes
+            ### Turns on hazards and brakes
             self.isColliding(lastCollision, timeRan)
 
-            # Only applies new controls if something has changed
+            ### Only applies new controls if something has changed
             if self.controls.__dict__ != oldControls and not driveWithKB:
                 oldControls = copy(self.controls.__dict__)
-                # self.controls.headlights = 0
                 self.ego.apply_control(self.controls, True)
 
             if timeRan > simDuration:
@@ -420,14 +451,14 @@ class Simulation():
 if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
-    sim.runSimulation(30, 0.2)
-    # plotData(s,a,j)
+    sim.runSimulation(30, 1, 0.5, "Classifier",True, True)
+    
 
 
 
 
 
-##### NOTE Old runSimulation
+##### NOTE Old runSimulation, trying threading
 # def oldRunSimulation(self, simDuration: float=10, updateInterval: float=1, plotting: bool=True):
 #         """
 #         Run simulation in LGSVL (OSSDC-SIM).
@@ -586,35 +617,5 @@ if __name__ == "__main__":
 # # runner.load_scenario_file(scenario_filepath_or_buffer='./deepscenario/overtake.deepscenario')
 # runner.connect_simulator_ads(simulator_port=8181, bridge_port=9090)
 # runner.run(mode=0) # mode=0: disable ADSs; mode=1: enable ADSs
-
-# pred = P("Classifier")
-# s = [10, 20, 15, 30, 30, 20]
-# j = 8
-# pred.predict(s, j)
-
-
-### Sensors
-# for sensor in ego.get_sensors():
-#     print(sensor.name, end=", ")
-#     # print(sensor.__dict__)
-#     print(sensor.enabled)
-#     # if sensor.name == "Lidar":
-#     #     print(f"min_distance: {sensor.min_distance}")
-#     #     print(f"max_distance: {sensor.max_distance}")
-#     #     print(f"rays: {sensor.rays}")
-#     #     print(f"rotations: {sensor.rotations}") # rotation frequency, Hz
-#     #     print(f"measurements: {sensor.measurements}") # = j["measurements"]  # how many measurements each ray does per one rotation
-#     #     print(f"fov: {sensor.fov}")
-#     #     print(f"angle: {sensor.angle}")
-#     #     print(f"compensated: {sensor.compensated}")
-
-#     if sensor.name == "IMU":
-#         # print(type(sensor))
-#         print(sensor.__init__)
-#         # for i in sensor:
-#         #     print(i)
-
-# print(sensor.name for sensor in sensors)
-
 
 
