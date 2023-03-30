@@ -129,6 +129,13 @@ class Simulation():
         self.state = lgsvl.AgentState()
         self.spawns = self.sim.get_spawn()
         self.state.transform = self.spawns[0]
+
+        # sp = self.spawns[0]
+        # forward = lgsvl.utils.transform_to_forward(self.spawns[0])
+        # right = lgsvl.utils.transform_to_right(self.spawns[0])
+        # self.state.transform.position = self.spawns[0].position + 120 * forward
+        # sp[0] += 120*lgsvl.utils.transform_to_forward(self.spawns[0])
+        # self.state.transform = sp
         
         self.ego = self.sim.add_agent(self.env.str("LGSVL__VEHICLE_0", lgsvl.wise.DefaultAssets.ego_lincoln2017mkz_apollo5), lgsvl.AgentType.EGO, self.state)
         self.ego.on_collision(on_collision)
@@ -203,7 +210,7 @@ class Simulation():
         self.changeTimeAndWeather(time=scenarios[scenario]["time"], rain=scenarios[scenario]["rain"])
 
 
-    def spawnNPCVehicle(self, vehicle: str="Sedan", front: int=10, side: int=0, rotation: int=0, speed: int=0, followLane: bool=False):
+    def spawnNPCVehicle(self, npcType: str="Sedan", front: int=10, side: int=0, rotation: int=0, speed: int=0, followLane: bool=False):
         """
         Spawn an NPC car that will follow the closest lane.
         Also stops for traffic lights.
@@ -216,24 +223,28 @@ class Simulation():
             * speed: int, set the speed (m/s) of the NPC
         """
         vehicles = ["Sedan", "SUV", "Jeep", "Hatchback", "SchoolBus", "BoxTruck"]
-        if vehicle not in vehicles:
-            print("The vehicle chosen does not exist!")
-            return
+        pedestrians = ["Bob", "Bill", "EntrepreneurFemale", "Howard", "Jun", "Johny", "Pamela", "Presley"] # More predestians exists
+        npc = None
+        if npcType in vehicles:
+            # print("The vehicle chosen does not exist!")
+            # return
         
-        state = lgsvl.AgentState()
+            state = lgsvl.AgentState()
 
-        forward = lgsvl.utils.transform_to_forward(self.spawns[0])
-        right = lgsvl.utils.transform_to_right(self.spawns[0])
-        state.transform.position = self.spawns[0].position + front * forward + side * right
-        self.spawns[0].rotation.y += rotation
-        state.transform.rotation = self.spawns[0].rotation
-        
-        npc = self.sim.add_agent(vehicle, lgsvl.AgentType.NPC, state)
-        if speed > 0 and followLane:
-            npc.follow_closest_lane(True, speed)
+            forward = lgsvl.utils.transform_to_forward(self.spawns[0])
+            right = lgsvl.utils.transform_to_right(self.spawns[0])
+            state.transform.position = self.spawns[0].position + front * forward + side * right
+            self.spawns[0].rotation.y += rotation
+            state.transform.rotation = self.spawns[0].rotation
+            
+            npc = self.sim.add_agent(npcType, lgsvl.AgentType.NPC, state)
+            if speed > 0 and followLane:
+                npc.follow_closest_lane(True, speed)
 
+        if npcType in pedestrians:
+            npc = self.sim.add_agent(npcType, lgsvl.AgentType.PEDESTRIAN)
         self.otherAgents.append(npc)
-        self.distanceToObjects.append(100000)
+        self.distanceToObjects.append(100000)    
 
 
     def useScenario(self, scene=1):
@@ -245,27 +256,60 @@ class Simulation():
 
         """
         print(f"Running scene number {scene}!")
+        forward = lgsvl.utils.transform_to_forward(self.spawns[0])
+        right = lgsvl.utils.transform_to_right(self.spawns[0])
+        rot = self.spawns[0].rotation
+        waypointsList = []
+
+        def runWithWaypoints(waypointsList):
+            for index, waypoints in enumerate(waypointsList):
+                if len(waypoints) > 0:
+                    # waypoints = [lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot) for f, r in directions]
+                    self.otherAgents[index].follow(waypoints, loop=False)
+                    self.otherAgents[index].on_waypoint_reached(self.onReach)
+                    # self.otherAgents[0].change_lane(False)
+            
         if scene == 1: # Car driving in front
             self.spawnNPCVehicle("Sedan", 20, 0.5, 0, 8, True)
             self.controls.throttle = 0.5
-        if scene == 2: # Lane change
-            self.spawnNPCVehicle("Sedan", -5, -3, 0, 8, True)
-            # self.otherAgents[0].follow_closest_lane(0,5,isLaneChange=False)
-            forward = lgsvl.utils.transform_to_forward(self.spawns[0])
-            right = lgsvl.utils.transform_to_right(self.spawns[0])
-            # pos = self.spawns[0].position + front * forward + side * right
-            rot = self.spawns[0].rotation
-            waypoints = [
-                lgsvl.DriveWaypoint(position=self.spawns[0].position + 10 * forward - 3 * right, speed=5, angle=rot),
-                lgsvl.DriveWaypoint(position=self.spawns[0].position + 30 * forward - 3 * right, speed=5, angle=rot),
-                # lgsvl.DriveWaypoint(position=self.spawns[0].position + 15 * forward + 0 * right, speed=5, angle=rot, idle=1),
-                # lgsvl.DriveWaypoint(position=self.spawns[0].position + 0 * forward - 5 * right, speed=5, angle=rot, idle=1),
-                # lgsvl.DriveWaypoint(lgsvl.Vector(1,0,5), 5, lgsvl.Vector(0, 0, 0), 0, False, 0),
-                ]
-            self.otherAgents[0].follow(waypoints, loop=False)
-            self.otherAgents[0].on_waypoint_reached(self.onReach)
-            # self.otherAgents[0].change_lane(False)
-            self.controls.throttle = 0
+        elif scene == 2: # Left lane, overtake, change to right lane, continue
+            self.spawnNPCVehicle("Sedan", -5, -4, 0, 8, True)
+            directions = [(0, -4), (10, -4), (30,-4), (33,0), (50,0)]
+            waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot) for f, r in directions])
+            runWithWaypoints(waypointsList)
+            self.controls.throttle = 0.4
+        elif scene == 3: # Driving between two vehicles
+            self.spawnNPCVehicle("SUV", 10, 0, 0, 10, True)
+            self.spawnNPCVehicle("BoxTruck", 8, -4, 0, 9, True)
+            self.controls.throttle = 0.4
+        elif scene == 4: # Car driving in front and changing lane
+            self.spawnNPCVehicle("Hatchback", 10, 0, 0, 8, True)
+            directions = [(42, 0), (48, -4), (60, -4)]
+            waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot) for f, r, i in directions])
+            runWithWaypoints(waypointsList)
+            self.controls.throttle = 0.4
+        elif scene == 5: # Meeting car at intersection
+            self.spawnNPCVehicle("SUV", 145, 32, 218)
+            directions = [(145, 32, 2), (100, -10, 0)]
+            waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot, idle=i) for f, r, i in directions])
+            runWithWaypoints(waypointsList)
+            self.controls.throttle = 0.4
+
+        # elif scnene == ... # With pedestrians
+        #     self.otherAgents.append(self.sim.add_agent("Bob", lgsvl.AgentType.PEDESTRIAN))
+        #     # directions = [(70, 3), (70, -10), (70, 3)]
+        #     directions = [(5, 3), (5, -10)]
+        #     waypointsList.append([lgsvl.WalkWaypoint(position=self.spawns[0].position + f * forward + r * right, idle=0, speed=1) for f, r in directions])
+        #     runWithWaypoints(waypointsList)
+        #     self.controls.throttle = 0.
+        #     npc = self.sim.add_agent("Bob", lgsvl.AgentType.PEDESTRIAN)
+        #     waypoints = [
+        #         lgsvl.WalkWaypoint(self.spawns[0], 1, 0),
+        #         lgsvl.WalkWaypoint(self.spawns[0], 2, 0),
+        #         lgsvl.WalkWaypoint(self.spawns[0], 1, 0),
+        #     ]
+        #     npc.follow(waypoints, loop=True)
+        #     self.sim.add_random_agents(lgsvl.AgentType.PEDESTRIAN)
 
 
     def onReach(self, agent, index):
@@ -274,7 +318,7 @@ class Simulation():
         NPC.on_waypoint_reached(self.onReach)
         """
         # print(agent)
-        print(f"Reached waypoint {index}")
+        print(f"{agent.name} has reached waypoint {index}")
         # print(args)
         # agent.change_lane(False)
         # self.otherAgents[0].change_lane(False)
@@ -334,7 +378,7 @@ class Simulation():
         return ttc
 
 
-    def runSimulation(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, model: str="Classifier", driveWithKB: bool=True, plotting: bool=True):
+    def runSimulation(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, model: str="Classifier", runScenario: int=0, plotting: bool=True):
         """
         Run a simulation in LGSVL (OSSDC-SIM).
 
@@ -343,7 +387,7 @@ class Simulation():
             * updateInterval: float, time (seconds) between each data logging
             * window: float, distance left/right the algorithm should look for obstacles
             * model: str, which model the predicter class should use
-            * driveWithKB: bool, if the car can be driven with the keyboard
+            * runScenario: int, if 0, the car can be driven with the keyboard, otherwise a scenario
             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
         """        
         ### Variables
@@ -359,9 +403,9 @@ class Simulation():
         
         ### Scenarios
         self.changeScenario("sunny_night")
-        if not driveWithKB:
+        if runScenario > 0:
             print("starting simulation...")
-            self.useScenario(scene=2)
+            self.useScenario(runScenario)
             # self.controls.throttle = 0.2
             # self.spawnNPCVehicle("Sedan", 30, 0.5, 0, True)
         else:
@@ -436,7 +480,7 @@ class Simulation():
             self.isColliding(lastCollision, timeRan)
 
             ### Only applies new controls if something has changed
-            if self.controls.__dict__ != oldControls and not driveWithKB:
+            if self.controls.__dict__ != oldControls and bool(runScenario):
                 oldControls = copy(self.controls.__dict__)
                 self.ego.apply_control(self.controls, True)
 
@@ -451,7 +495,7 @@ class Simulation():
 if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
-    sim.runSimulation(30, 1, 0.5, "Classifier",True, True)
+    sim.runSimulation(30, 1, 0.5, "Classifier", 5, False)
     
 
 
