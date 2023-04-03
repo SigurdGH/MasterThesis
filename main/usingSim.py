@@ -495,7 +495,7 @@ class Simulation():
 if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
-    sim.runSimulation(30, 1, 0.5, "Classifier", 5, False)
+    sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
     
 
 
