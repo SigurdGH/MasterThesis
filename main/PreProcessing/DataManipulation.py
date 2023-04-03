@@ -50,6 +50,18 @@ class DataManipulation():
                     prev = res.loc[idx, speeds[speed_idx:]].values.tolist()
                     res.loc[idx, speeds] = [prev[0] + random.uniform(-1, row[speed] / 10) for _ in range(0, len(speeds)- len(prev))] + prev
                     break
+        
+        inc_fac = 1.2
+        # increase all speed columns by 10% (where collision occured)
+        res.loc[res["Attribute[COL]"] == True, speeds] = res.loc[res["Attribute[COL]"] == True, speeds].values * inc_fac
+        
+        # we will also increase the Attribute[DTO] by 10% (where collision occured)
+        # res.loc[res["Attribute[COL]"] == True, "Attribute[DTO]"] = res.loc[res["Attribute[COL]"] == True, "Attribute[DTO]"].values * inc_fac
+
+        distance_inc = 3
+        # we also need to make sure that the Attribute[DTO] is at least 3 meters. So if it is less than 3, we will increase it by 3 + random.uniform(0, 1) + original value
+        condition = (res["Attribute[DTO]"] <= 10) #& (res["speed6"] >= 10)
+        res.loc[condition, "Attribute[DTO]"] = res.loc[condition, "Attribute[DTO]"].values + distance_inc + random.uniform(0, 1)
         self._data = res
 
     def addFromXML(self, filename: str="") -> None:
