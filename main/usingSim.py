@@ -475,6 +475,11 @@ class Simulation():
             if predictions[-1] and predictions[-1] != predictions[-2]:
                 print("A COLLISION IS GOING TO HAPPEN!")
                 lastCollision = timeRan
+            #     self.controls.braking = 1
+            #     self.ego.apply_control(self.controls, True)
+            # else:
+            #     self.controls.braking = 0
+            #     self.ego.apply_control(self.controls, False)
 
             ### Turns on hazards and brakes
             self.isColliding(lastCollision, timeRan)
@@ -496,7 +501,7 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=12, updateInterval=0.5, window=1.4, model="xgb_2_582-11-16-201", runScenario=1, plotting=False)
+    sim.runSimulation(simDuration=30, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=0, plotting=False)
 
 
 
