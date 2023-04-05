@@ -102,7 +102,7 @@ class P():
         if len(angular) < 6:
             x = [ttc, dto, jerk] + speeds
         else:
-            x = [ttc, dto, jerk] + speeds + np.array(angular).flatten().tolist()
+            x = [dto, jerk] + speeds + np.array(angular).flatten().tolist()
         # print(f"Inne i predict: {x}")
         xP, _ = self.model.preProcess(x)
         # print(f"x: {x}\t\tprocessed: {xP[0]}")
@@ -385,7 +385,7 @@ class Simulation():
         ### Params:
             * simDuration: float, time (seconds) for simulation duration
             * updateInterval: float, time (seconds) between each data logging
-            * window: float, distance left/right the algorithm should look for obstacles
+            * window: float, distance (meters) left/right the algorithm should look for obstacles
             * model: str, which model the predicter class should use
             * runScenario: int, if 0, the car can be driven with the keyboard, otherwise a scenario
             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
@@ -423,7 +423,7 @@ class Simulation():
         self.controls.headlights = 0
         self.ego.apply_control(self.controls, False)
         while True:
-            self.sim.run(updateInterval)
+            self.sim.run(updateInterval) # NOTE can speed up the virtual time in the simulator
             timeRan += updateInterval
             for sensor in self.ego.get_sensors(): # maybe use __dict__ to get to the sensor immediately
                 if sensor.name == "Lidar":
@@ -468,8 +468,8 @@ class Simulation():
 
             ### Starts the collision prediction
             if len(speeds) > 5 // updateInterval:
-                predictions.append(pred.predict(ttc=ttcList[-1], dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec]))
-                # predictions.append(pred.predict(dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
+                # predictions.append(pred.predict(ttc=ttcList[-1], dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec]))
+                predictions.append(pred.predict(dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
             
             ### Check if a collision has been predicted
             if predictions[-1] and predictions[-1] != predictions[-2]:
@@ -495,8 +495,8 @@ class Simulation():
 if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
-    sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    
+    # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
+    sim.runSimulation(simDuration=12, updateInterval=0.5, window=1.4, model="xgb_2_582-11-16-201", runScenario=1, plotting=False)
 
 
 
