@@ -15,8 +15,8 @@ class ReadLidar():
             * filename: str, name of the .pcd file that keeps being reuploaded during simulation
         """
         self.mid = 180
-        self.vehicleHeight = 0.2
-        self.ground = -2.0 # Represents the lidar z-coordinate that corresponds approximately to the ground, the value
+        self.vehicleHeight = 0.
+        self.ground = -2.0 # Represents the lidar z-coordinate that corresponds approximately to the ground
         self.window = window if window > 0 else 0.1
         self.rays = rays if rays < 32 else 32
         self.indexes = np.arange(360*rays)
@@ -66,6 +66,7 @@ class ReadLidar():
 
     def getPointsInFront(self):
         """
+        ### NOTE: Not used, only used for visualizing
         Store only the points that are in front of the vehicle +/- the window size.\\
         Skips the first 720 points as some of them hits the EGO vehicle's bonnet and trunk
         """
@@ -73,7 +74,7 @@ class ReadLidar():
         # self.inFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid and i % 360 <= self.mid])
         # print(len(self.inFront))
         self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 0 and y > -self.window and y < self.window])
-
+        self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z < self.vehicleHeight])
 
     def getDistanceToObstacle(self):
         """
@@ -92,7 +93,7 @@ class ReadLidar():
 
         TODO: See at other points as well that are not directly in front.
         """
-        self.closestPointInFront = (100,0,-1) # (102.87,0,-1)
+        self.closestPointInFront = (102.87,0,-1) # (102.87,0,-1)
         # for x, y, z in self.inFront:
         #     # print(x, y, z)
         #     # if z > self.ground and z < self.vehicleHeight and np.sqrt(x**2+y**2) < np.sqrt(self.closestPointInFront[0]**2+self.closestPointInFront[1]**2):
@@ -155,22 +156,21 @@ class ReadLidar():
     @property
     def updatedDTO(self):
         """
-        Propery to get the updated DTO. Updates the DTO each time it is called.
+        Propery to get the updated DTO. Reads a new point cloud to calculate a new DTO each time it is called.
         """
         self.readPCD()
-        # self.getPointsInFront()
         return self.getDistanceToObstacle()
 
 
 if __name__ == "__main__":
     # lidar = ReadLidar(window=0.5, rays=20, filename=".\MasterThesis\data\\album\lidar8.pcd")
-    # lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidarUpdate.pcd")
-    lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
-    # lidar.readPCD()
+    lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidarUpdate.pcd")
+    # lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
+    lidar.readPCD()
 
-    # lidar.getPointsInFront()
-    # print(lidar.inFront)
-    # lidar.vizualizePointCloud(lidar.inFront)
+    lidar.getPointsInFront()
+    print(lidar.inFront)
+    lidar.vizualizePointCloud(lidar.inFront)
     # closest = lidar.getDistanceToObstacle()
     # print(lidar.getDistanceToObstacle())#, np.sqrt(closest[0]**2+closest[1]**2))
     # print(lidar.closestPointInFront)
@@ -178,17 +178,5 @@ if __name__ == "__main__":
     print(lidar.updatedDTO)
     evasive = lidar.getEvasiveAction(10)
     print(evasive)
-
-    # l= lidar.test()
-    # print(l)
-    # lidar.vizualizePointCloud(np.vstack([lidar.inFront, lidar.vectorList[:360*1]]))
-    # lidar.vizualizePointCloud(np.vstack([lidar.inFront, evasive]))
-
-    # for i in range(5,10):
-    #     lidar = ReadLidar(window=0, rays=35, filename=f".\MasterThesis\data\\album\lidar{i}.pcd")
-    #     lidar.readPCD()
-    #     lidar.getPointsInFront()
-    #     # print(lidar.updatedDTO)
-    #     lidar.vizualizePointCloud(np.vstack([lidar.inFront, lidar.vectorList[:360*1]]))
 
         

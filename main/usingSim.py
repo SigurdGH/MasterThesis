@@ -7,6 +7,7 @@ from ML.Model import Predicter
 from readLidar import ReadLidar
 from threading import Thread
 from time import time
+from pandas import DataFrame
 
 # TODO
 # Seems like positions are wrong when loading files to the scenariorunner.
@@ -17,13 +18,13 @@ from time import time
 # * Maybe use absolute value in stead of average jerk
 
 
-def on_collision(agent1, agent2, contact):
-    """
-    From deepscenario-toolset
-    """
-    name1 = agent1.__dict__.get('name')
-    name2 = agent2.__dict__.get('name') if agent2 is not None else "OBSTACLE"
-    print(f"{name1} collided with {name2} at {contact}")
+# def on_collision(agent1, agent2, contact):
+#     """
+#     From deepscenario-toolset
+#     """
+#     name1 = agent1.__dict__.get('name')
+#     name2 = agent2.__dict__.get('name') if agent2 is not None else "OBSTACLE"
+#     print(f"{name1} collided with {name2} at {contact}")
 
 
 def on_custom(agent, kind, context):
@@ -117,13 +118,20 @@ class Simulation():
     """
     Simulation class
 
+    ### NOTE:
+    The simulator program might need to be restarted if the map is changed.
+
     ### Params:
-        map: str, 'bg' for Borregas Avenue or 'sf' for San Francisco
+        map: str, 'bg' for Borregas Avenue, 'sf' for San Francisco or 'ct' for Cube Town.
     """
     def __init__(self, map: str="bg") -> None:
         self.env = Env()
         self.sim = lgsvl.Simulator(self.env.str("LGSVL__SIMULATOR_HOST", lgsvl.wise.SimulatorSettings.simulator_host), self.env.int("LGSVL__SIMULATOR_PORT", lgsvl.wise.SimulatorSettings.simulator_port))
         
+        
+        self.maps = {"sf": lgsvl.wise.DefaultAssets.map_sanfrancisco,
+                     "bg": lgsvl.wise.DefaultAssets.map_borregasave,
+                     "ct": lgsvl.wise.DefaultAssets.map_cubetown}
         self.changeMap(map)
         
         self.state = lgsvl.AgentState()
@@ -138,7 +146,8 @@ class Simulation():
         # self.state.transform = sp
         
         self.ego = self.sim.add_agent(self.env.str("LGSVL__VEHICLE_0", lgsvl.wise.DefaultAssets.ego_lincoln2017mkz_apollo5), lgsvl.AgentType.EGO, self.state)
-        self.ego.on_collision(on_collision)
+        self.actualCollisionTimeStamp = -1
+        self.ego.on_collision(self.on_ego_collision)
         self.ego.on_custom(on_custom) # NOT WORKING
         
         self.controls = lgsvl.VehicleControl()
@@ -148,6 +157,16 @@ class Simulation():
         self.distanceToObjects = []
 
 
+    def on_ego_collision(self, agent1, agent2, contact):
+        """
+        From deepscenario-toolset
+        """
+        self.actualCollisionTimeStamp = self.sim.current_time
+        name1 = agent1.__dict__.get('name')
+        name2 = agent2.__dict__.get('name') if agent2 is not None else "OBSTACLE"
+        print(f"{name1} collided with {name2} at {contact}, time: {round(self.actualCollisionTimeStamp, 2)}")
+
+
     def changeMap(self, map: str="bg"):
         """
         Change or load map.
@@ -155,14 +174,26 @@ class Simulation():
         ### Params:
             * map: str, 'bg' for Borregas Avenue or 'sf' for San Francisco
         """
-        self.selectedMap = lgsvl.wise.DefaultAssets.map_borregasave
-        if map != "bg":
-            self.selectedMap = lgsvl.wise.DefaultAssets.map_sanfrancisco
+        try:
+            if self.sim.current_scene ==  self.maps[map]:
+                self.sim.reset()
+            else:
+                self.sim.load(self.maps[map])
+        except KeyError as e:
+            print(f"This map does not exist in this program. Error: {e}")
+            
 
-        if self.sim.current_scene ==  self.selectedMap:
-            self.sim.reset()
-        else:
-            self.sim.load(self.selectedMap)
+            # if self.selectedMap == self.maps[map]:
+
+            # self.selectedMap = self.maps[map]
+        
+        # if map != "bg":
+        #     self.selectedMap = lgsvl.wise.DefaultAssets.map_sanfrancisco
+
+        # if self.sim.current_scene ==  self.selectedMap:
+        #     self.sim.reset()
+        # else:
+        #     self.sim.load(self.selectedMap)
 
 
     def changeTimeAndWeather(self, time: int=0, rain: float=0.0, fog: float=0.0, damage: float=0.0):
@@ -188,7 +219,7 @@ class Simulation():
             print(f"The parameters sent in are not valid! You sent in: rain: {rain}, fog: {fog}, damage{damage}.")
 
         self.controls.headlights = 1 if time > 19 or time < 7 else 0
-        # self.controls.windshield_wipers = True if rain > 0.1 else False # Wipers does not work :(
+        # self.controls.windshield_wipers = True if rain > 0.1 else False # Wipers do not work :(
 
         self.sim.weather = change
 
@@ -240,7 +271,7 @@ class Simulation():
             npc = self.sim.add_agent(npcType, lgsvl.AgentType.NPC, state)
             if speed > 0 and followLane:
                 npc.follow_closest_lane(True, speed)
-
+            # npc.on_collision(self.on_collision)
         if npcType in pedestrians:
             npc = self.sim.add_agent(npcType, lgsvl.AgentType.PEDESTRIAN)
         self.otherAgents.append(npc)
@@ -261,6 +292,8 @@ class Simulation():
         rot = self.spawns[0].rotation
         waypointsList = []
 
+        # if self.sim.current_scene != self.maps.get(map, ""): self.changeMap(map)
+
         def runWithWaypoints(waypointsList):
             for index, waypoints in enumerate(waypointsList):
                 if len(waypoints) > 0:
@@ -277,7 +310,7 @@ class Simulation():
             directions = [(0, -4), (10, -4), (30,-4), (33,0), (50,0)]
             waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot) for f, r in directions])
             runWithWaypoints(waypointsList)
-            self.controls.throttle = 0.4
+            self.controls.throttle = 0.2
         elif scene == 3: # Driving between two vehicles
             self.spawnNPCVehicle("SUV", 10, 0, 0, 10, True)
             self.spawnNPCVehicle("BoxTruck", 8, -4, 0, 9, True)
@@ -378,6 +411,17 @@ class Simulation():
         return ttc
 
 
+    def writeParameters(self, paramsToStore: list[list], write: bool):
+        # with open("additionalData.csv", "a")
+        df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
+        # print(f"cols: {len(df.columns)}")
+        for line in paramsToStore:
+            # print(f"line: {len(line)}")
+            df.loc[len(df)] = line
+        if write:
+            df.to_csv("MasterThesis/data/additionalData.csv", index=False)
+
+
     def runSimulation(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, model: str="Classifier", runScenario: int=0, plotting: bool=True):
         """
         Run a simulation in LGSVL (OSSDC-SIM).
@@ -400,11 +444,16 @@ class Simulation():
         angular = [[0,0,0]]
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
-        
+
+        storePredictions = True
+        # df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
+        paramsToStore = []
+
         ### Scenarios
-        self.changeScenario("sunny_night")
+        # self.changeScenario("sunny_night")
+        self.changeTimeAndWeather(6)
         if runScenario > 0:
-            print("starting simulation...")
+            print(f"starting simulation with scenario {runScenario}...")
             self.useScenario(runScenario)
             # self.controls.throttle = 0.2
             # self.spawnNPCVehicle("Sedan", 30, 0.5, 0, True)
@@ -427,7 +476,7 @@ class Simulation():
             timeRan += updateInterval
             for sensor in self.ego.get_sensors(): # maybe use __dict__ to get to the sensor immediately
                 if sensor.name == "Lidar":
-                    sensor.save("C:/MasterFiles/MasterThesis/data/lidarUpdate.pcd")
+                    sensor.save("C:/MasterFiles/MasterThesis/data/lidarUpdate.pcd") # TODO make this work on other PCs
                     distance = lidar.updatedDTO
                     # print(f"Lidar: {round(distance, 3)} m, speed: {round(self.ego.state.speed, 3)} m/s", end="\t")
                     # from coordinates: {round(self.distanceToObjects[-1], 3)}, diff: {round(round(distance, 2)-round(self.distanceToObjects[-1], 2), 3)}
@@ -438,7 +487,7 @@ class Simulation():
             speed = self.ego.state.speed
             speeds.append(round(speed, 3))
             acceleration.append((speeds[-1]-speeds[-2])/updateInterval)
-            jerk.append((acceleration[-1]-acceleration[-2])/updateInterval)
+            jerk.append(round(abs((acceleration[-1]-acceleration[-2])/updateInterval), 3)) # NOTE looks like jerk is always positive in the dataset
 
             ### Angular
             angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
@@ -452,9 +501,11 @@ class Simulation():
             # else:
             #     self.controls.throttle = 0
 
-            ttcList.append(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval))
+            ttcList.append(round(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval), 3))
             # print(f"TTC: {round(ttcList[-1], 2)} \t Time: {round(self.sim.current_time, 1)} \t Throttle: {round(self.controls.throttle, 1)}")
-            print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
+
+            ### Some nice information
+            # print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
             
             ### Evasive action
             # if dtoList[-1] < 15:
@@ -469,8 +520,15 @@ class Simulation():
             ### Starts the collision prediction
             if len(speeds) > 5 // updateInterval:
                 # predictions.append(pred.predict(ttc=ttcList[-1], dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec]))
-                predictions.append(pred.predict(dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
-            
+                predictions.append(pred.predict(dto=dtoList[-1], jerk=round(np.average(jerk[-(6*intsPerSec)::intsPerSec]), 3), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
+
+                if storePredictions:
+                    # TODO Make it so the last x before an actual collision also is 1?
+                    actualCollision = 1 if self.actualCollisionTimeStamp > timeRan-updateInterval else 0
+                    if len(paramsToStore) > 0: paramsToStore[-1][-1] = actualCollision
+                    paramsToStore.append([ttcList[-1], dtoList[-1], round(np.average(jerk[-(6*intsPerSec)::intsPerSec]), 3)] + [i for i in speeds[-(6*intsPerSec)::intsPerSec]] + [i for xyz in angular[-(6*intsPerSec)::intsPerSec] for i in xyz] + [predictions[-1], None])
+                if len(paramsToStore) > 1: print(paramsToStore[-2])
+
             ### Check if a collision has been predicted
             if predictions[-1] and predictions[-1] != predictions[-2]:
                 print("A COLLISION IS GOING TO HAPPEN!")
@@ -481,7 +539,7 @@ class Simulation():
             #     self.controls.braking = 0
             #     self.ego.apply_control(self.controls, False)
 
-            ### Turns on hazards and brakes
+            ### Turns on hazards and applies the brakes
             self.isColliding(lastCollision, timeRan)
 
             ### Only applies new controls if something has changed
@@ -493,6 +551,9 @@ class Simulation():
                 self.sim.stop()
                 break
 
+        if storePredictions:
+            self.writeParameters(paramsToStore, True)
+
         if plotting:
             plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList)
 
@@ -501,7 +562,7 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=30, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=0, plotting=False)
+    sim.runSimulation(simDuration=20, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=1, plotting=True)
 
 
 
