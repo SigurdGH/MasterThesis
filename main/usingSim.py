@@ -3,11 +3,14 @@ import lgsvl
 import matplotlib.pyplot as plt
 import numpy as np
 from copy import copy
-from ML.Model import Predicter
-from readLidar import ReadLidar
 from threading import Thread
 from time import time
 from pandas import DataFrame
+import sys
+
+sys.path.insert(0, "..")
+from main.ML.Model import Predicter
+from main.readLidar import ReadLidar
 
 # TODO
 # Seems like positions are wrong when loading files to the scenariorunner.
