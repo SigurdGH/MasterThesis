@@ -1,16 +1,21 @@
+import os
+import sys
 from environs import Env
 import lgsvl
 import matplotlib.pyplot as plt
 import numpy as np
 from copy import copy
-from threading import Thread
+# from threading import Thread
 from time import time
 from pandas import DataFrame
-import sys
 
-sys.path.insert(0, "..")
+PATH = os.path.abspath(__file__)
+PATH = PATH[:PATH[:PATH.rfind("\\")].rfind("\\")]
+sys.path.insert(0, PATH)
+
 from main.ML.Model import Predicter
 from main.readLidar import ReadLidar
+
 
 # TODO
 # Seems like positions are wrong when loading files to the scenariorunner.
@@ -125,7 +130,7 @@ class Simulation():
     The simulator program might need to be restarted if the map is changed.
 
     ### Params:
-        map: str, 'bg' for Borregas Avenue, 'sf' for San Francisco or 'ct' for Cube Town.
+        * map: str, 'bg' for Borregas Avenue, 'sf' for San Francisco or 'ct' for Cube Town.
     """
     def __init__(self, map: str="bg") -> None:
         self.env = Env()
@@ -162,7 +167,10 @@ class Simulation():
 
     def on_ego_collision(self, agent1, agent2, contact):
         """
-        From deepscenario-toolset
+        From deepscenario-toolset.
+
+        ### NOTE
+        Sometimes a collision with a tree (++?) is not registered!
         """
         self.actualCollisionTimeStamp = self.sim.current_time
         name1 = agent1.__dict__.get('name')
@@ -380,7 +388,7 @@ class Simulation():
             self.controls.turn_signal_right = True
 
 
-    def getDTOs(self):
+    def getDTOsFromCoordinates(self):
         """
         Calculate the distance between the EGO vehicle and all other NPCs by looking at the 
         coordinates for all NPCs in the simulator.
@@ -414,7 +422,7 @@ class Simulation():
         return ttc
 
 
-    def writeParameters(self, paramsToStore: list[list], write: bool):
+    def writeParameters(self, paramsToStore: list[list], write: bool=True):
         # with open("additionalData.csv", "a")
         df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
         # print(f"cols: {len(df.columns)}")
@@ -425,7 +433,7 @@ class Simulation():
             df.to_csv("MasterThesis/data/additionalData.csv", index=False)
 
 
-    def runSimulation(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, model: str="Classifier", runScenario: int=0, plotting: bool=True):
+    def runSimulation(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, model: str="Classifier", runScenario: int=0, plotting: bool=True, storePredictions: bool = False):
         """
         Run a simulation in LGSVL (OSSDC-SIM).
 
@@ -448,7 +456,7 @@ class Simulation():
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
 
-        storePredictions = True
+        
         # df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
         paramsToStore = []
 
@@ -466,7 +474,7 @@ class Simulation():
         
         ### Classes
         pred = P(model)
-        lidar = ReadLidar(window, 35, ".\MasterThesis\data\lidarUpdate.pcd")
+        lidar = ReadLidar(window, 35)
 
         intsPerSec = int(1//updateInterval)
         print(f"Updating {intsPerSec} times per second!")
@@ -479,7 +487,7 @@ class Simulation():
             timeRan += updateInterval
             for sensor in self.ego.get_sensors(): # maybe use __dict__ to get to the sensor immediately
                 if sensor.name == "Lidar":
-                    sensor.save("C:/MasterFiles/MasterThesis/data/lidarUpdate.pcd") # TODO make this work on other PCs
+                    sensor.save(PATH + "/data/lidarUpdate.pcd") # TODO make this work on other PCs
                     distance = lidar.updatedDTO
                     # print(f"Lidar: {round(distance, 3)} m, speed: {round(self.ego.state.speed, 3)} m/s", end="\t")
                     # from coordinates: {round(self.distanceToObjects[-1], 3)}, diff: {round(round(distance, 2)-round(self.distanceToObjects[-1], 2), 3)}
@@ -508,7 +516,7 @@ class Simulation():
             # print(f"TTC: {round(ttcList[-1], 2)} \t Time: {round(self.sim.current_time, 1)} \t Throttle: {round(self.controls.throttle, 1)}")
 
             ### Some nice information
-            # print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
+            print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
             
             ### Evasive action
             # if dtoList[-1] < 15:
@@ -530,7 +538,8 @@ class Simulation():
                     actualCollision = 1 if self.actualCollisionTimeStamp > timeRan-updateInterval else 0
                     if len(paramsToStore) > 0: paramsToStore[-1][-1] = actualCollision
                     paramsToStore.append([ttcList[-1], dtoList[-1], round(np.average(jerk[-(6*intsPerSec)::intsPerSec]), 3)] + [i for i in speeds[-(6*intsPerSec)::intsPerSec]] + [i for xyz in angular[-(6*intsPerSec)::intsPerSec] for i in xyz] + [predictions[-1], None])
-                if len(paramsToStore) > 1: print(paramsToStore[-2])
+                # if len(paramsToStore) > 1: 
+                #     print(paramsToStore[-2])
 
             ### Check if a collision has been predicted
             if predictions[-1] and predictions[-1] != predictions[-2]:
@@ -564,8 +573,8 @@ class Simulation():
 if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
-    # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=20, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=1, plotting=True)
+    # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
+    sim.runSimulation(simDuration=20, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=0, plotting=True, storePredictions=True)
 
 
 

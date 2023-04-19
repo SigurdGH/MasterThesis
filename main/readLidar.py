@@ -1,17 +1,19 @@
+import os
 import numpy as np
 import open3d as o3d
 from accepts import accepts
 
-import time
+PATH = os.path.abspath(__file__)
+PATH = PATH[:PATH[:PATH.rfind("\\")].rfind("\\")]
 
 
 class ReadLidar():
-    def __init__(self, window=1.4, rays=20, filename="../data/lidar.pcd"):
+    def __init__(self, window=1.4, rays=20, filename=PATH+"/data/lidarUpdate.pcd"):
         """
         Get distance to objects by using a .pcd file.
         ### Params:
             * window: float, how many meters left/right of the center the algorithm looks for objects in front of the vehicle. The vehicle is around 2.6(?) m wide.
-            * rays: int, how many rays the algorithm searches for an obect, more = longer reach, max 32(?)
+            * rays: int, how many rays the algorithm searches for an obect, higher value = longer reach, max 32(?)
             * filename: str, name of the .pcd file that keeps being reuploaded during simulation
         """
         self.mid = 180
@@ -164,7 +166,7 @@ class ReadLidar():
 
 if __name__ == "__main__":
     # lidar = ReadLidar(window=0.5, rays=20, filename=".\MasterThesis\data\\album\lidar8.pcd")
-    lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidarUpdate.pcd")
+    lidar = ReadLidar(window=1.4, rays=35)
     # lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
     lidar.readPCD()
 
