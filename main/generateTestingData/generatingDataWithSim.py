@@ -49,9 +49,14 @@ class GenerateData(Simulation):
     def generateDataWithSim(self, simDuration: float=10, updateInterval: float=1, window: float=0.5):
         """
         ### NOTE should maybe store the average value from the last second?
+        Run the simulation and driving with the keyboard.\\
+        Generate data from each second of running.
+        Stores the parameters Time, TTC, DTO, JERK, Speed, AngularSpeedX, AngularSpeedY, AngularSpeedZ, COL in a csv-file.
 
         ### Params:
-            * TODO
+            * simDuration: float, time (seconds) for simulation duration
+            * updateInterval: float, time (seconds) between each data logging
+            * window: float, distance (meters) left/right the algorithm should look for obstacles
         """
         acceleration = [0]
         timeRan = 0 # seconds
@@ -71,7 +76,7 @@ class GenerateData(Simulation):
 
         self.changeTimeAndWeather(6)
 
-        lidar = ReadLidar(window, 35)
+        lidar = ReadLidar(window)
 
         intsPerSec = int(1//updateInterval)
         print(f"Updating {intsPerSec} times per second!")
@@ -97,6 +102,12 @@ class GenerateData(Simulation):
                 paramsToStore["TTC"].append(round(self.getTTC(paramsToStore["Speed"][-1], paramsToStore["DTO"][-1], paramsToStore["DTO"][-1], updateInterval), 3))
                 paramsToStore["COL"].append(1 if self.actualCollisionTimeStamp > timeRan-1 else 0)
 
+                # Marks the values before the collision also as a collision, until the TTC is over 3 or up to 5 seconds before the collision
+                if self.actualCollisionTimeStamp > timeRan-1:
+                    for i, ttc in enumerate(paramsToStore["TTC"][::-1]):
+                        if i >= 6 or ttc >= 3: break
+                        paramsToStore["COL"][-i] = 1
+
                 ### Some nice information
                 for (feature, value), metric in zip(paramsToStore.items(), metrics):
                     if "Angular" in feature: continue
@@ -111,6 +122,7 @@ class GenerateData(Simulation):
 
         if storePredictions:
             self.storeDataGenerated(paramsToStore, True)
+
 
 if __name__ == "__main__":
     sim = GenerateData("sf")

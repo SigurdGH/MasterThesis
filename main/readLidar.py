@@ -8,7 +8,7 @@ PATH = PATH[:PATH[:PATH.rfind("\\")].rfind("\\")]
 
 
 class ReadLidar():
-    def __init__(self, window=1.4, rays=20, filename=PATH+"/data/lidarUpdate.pcd"):
+    def __init__(self, window=1.4, rays=32, filename=PATH+"/data/lidarUpdate.pcd"):
         """
         Get distance to objects by using a .pcd file.
         ### Params:
@@ -166,13 +166,14 @@ class ReadLidar():
 
 if __name__ == "__main__":
     # lidar = ReadLidar(window=0.5, rays=20, filename=".\MasterThesis\data\\album\lidar8.pcd")
-    lidar = ReadLidar(window=1.4, rays=35)
-    # lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
+    # lidar = ReadLidar(window=1.4, rays=35)
+    lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
     lidar.readPCD()
 
     lidar.getPointsInFront()
     print(lidar.inFront)
     lidar.vizualizePointCloud(lidar.inFront)
+    # lidar.vizualizePointCloud(lidar.vectorList)
     # closest = lidar.getDistanceToObstacle()
     # print(lidar.getDistanceToObstacle())#, np.sqrt(closest[0]**2+closest[1]**2))
     # print(lidar.closestPointInFront)
