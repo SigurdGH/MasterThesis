@@ -75,7 +75,7 @@ class ReadLidar():
         # self.inFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid-self.window and i % 360 <= self.mid+self.window])
         # self.inFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid and i % 360 <= self.mid])
         # print(len(self.inFront))
-        self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 0 and y > -self.window and y < self.window])
+        # self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 0 and y > -self.window and y < self.window])
         self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z < self.vehicleHeight])
 
     def getDistanceToObstacle(self):

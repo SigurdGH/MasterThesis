@@ -1,5 +1,6 @@
 import os
 import sys
+import lgsvl
 from pandas import DataFrame, read_csv, concat
 
 PATH = os.path.abspath(__file__)
@@ -17,13 +18,17 @@ class GenerateData(Simulation):
 
     def spawnRandomNPCs(self, amountVehicles: int=10, amountPedestrians: int=20):
         """
-        Spawns random NPCs, both pedestrians and vehicles that are roaming the map.
+        Spawns random NPCs, both pedestrians and vehicles that are roaming the map.\\
+        NPCs spawn around the area the EGO vehicle is located.
         
         ### Params:
             * amountVehicles: int, number of vehicles to spawn
             * amountPedestrians: int, number of pedestrians to spawn
         """
-        pass
+        for _ in range(amountVehicles):
+            self.sim.add_random_agents(lgsvl.AgentType.NPC)
+        for _ in range(amountPedestrians):
+            self.sim.add_random_agents(lgsvl.AgentType.PEDESTRIAN)
 
 
     def storeDataGenerated(self, paramsToStore: dict, write: bool=True):
@@ -60,6 +65,7 @@ class GenerateData(Simulation):
         """
         acceleration = [0]
         timeRan = 0 # seconds
+        timeBetweenLogging = 1 # seconds
 
         storePredictions = True
         paramsToStore = {"Time": [0],
@@ -67,9 +73,9 @@ class GenerateData(Simulation):
                          "DTO": [0],
                          "JERK": [0],
                          "Speed": [0],
-                         "AngularSpeedX": [0],
-                         "AngularSpeedY": [0],
-                         "AngularSpeedZ": [0],
+                         "asX": [0],
+                         "asY": [0],
+                         "asZ": [0],
                          "COL": [0]}
 
         metrics = [" s", " s", " m", " m/s^3", " m/s", " m/s", " m/s", " m/s", ""]
@@ -85,21 +91,19 @@ class GenerateData(Simulation):
             self.sim.run(updateInterval) # NOTE can speed up the virtual time in the simulator
             timeRan += updateInterval
 
-            if storePredictions and timeRan % 1 == 0:
-                for sensor in self.ego.get_sensors(): # maybe use __dict__ to get to the sensor immediately
-                    if sensor.name == "Lidar":
-                        sensor.save(PATH + "/data/lidarUpdate.pcd") # TODO make this filename work on other PCs
-                        paramsToStore["DTO"].append(lidar.updatedDTO)
-                        break
+            if storePredictions and timeRan % timeBetweenLogging == 0:
+                # print(self.ego.get_sensors()[2].name)
+                self.ego.get_sensors()[2].save(PATH + "/data/lidarUpdate.pcd")
+                paramsToStore["DTO"].append(lidar.updatedDTO)
                 
                 paramsToStore["Time"].append(timeRan)
                 paramsToStore["Speed"].append(round(self.ego.state.speed, 3))
-                acceleration.append((paramsToStore["Speed"][-1]-paramsToStore["Speed"][-2])/updateInterval)
-                paramsToStore["JERK"].append(round(abs((acceleration[-1]-acceleration[-2])/updateInterval), 3)) # NOTE looks like jerk is always positive in the dataset
-                paramsToStore["AngularSpeedX"].append(round(self.ego.state.angular_velocity.x, 3))
-                paramsToStore["AngularSpeedY"].append(round(self.ego.state.angular_velocity.y, 3))
-                paramsToStore["AngularSpeedZ"].append(round(self.ego.state.angular_velocity.z, 3))
-                paramsToStore["TTC"].append(round(self.getTTC(paramsToStore["Speed"][-1], paramsToStore["DTO"][-1], paramsToStore["DTO"][-1], updateInterval), 3))
+                acceleration.append((paramsToStore["Speed"][-1]-paramsToStore["Speed"][-2])/timeBetweenLogging)
+                paramsToStore["JERK"].append(round(abs((acceleration[-1]-acceleration[-2])/timeBetweenLogging), 3))
+                paramsToStore["asX"].append(round(self.ego.state.angular_velocity.x, 3))
+                paramsToStore["asY"].append(round(self.ego.state.angular_velocity.y, 3))
+                paramsToStore["asZ"].append(round(self.ego.state.angular_velocity.z, 3))
+                paramsToStore["TTC"].append(round(self.getTTC(paramsToStore["Speed"][-1], paramsToStore["DTO"][-1], paramsToStore["DTO"][-1], timeBetweenLogging), 3))
                 paramsToStore["COL"].append(1 if self.actualCollisionTimeStamp > timeRan-1 else 0)
 
                 # Marks the values before the collision also as a collision, until the TTC is over 3 or up to 5 seconds before the collision
@@ -126,7 +130,8 @@ class GenerateData(Simulation):
 
 if __name__ == "__main__":
     sim = GenerateData("sf")
-    sim.generateDataWithSim(simDuration=10, updateInterval=0.5, window=1.0)
+    sim.spawnRandomNPCs(amountVehicles=30, amountPedestrians=10)
+    sim.generateDataWithSim(simDuration=60, updateInterval=0.5, window=1.0)
 
 
 
