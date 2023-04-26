@@ -8,6 +8,7 @@ from copy import copy
 # from threading import Thread
 from time import time
 from pandas import DataFrame
+import math
 
 PATH = os.path.abspath(__file__)
 PATH = PATH[:PATH[:PATH.rfind("\\")].rfind("\\")]
@@ -433,7 +434,95 @@ class Simulation():
             df.to_csv("MasterThesis/data/additionalData.csv", index=False)
 
 
-    def runSimulation(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, model: str="Classifier", runScenario: int=0, plotting: bool=True, storePredictions: bool = False):
+    @staticmethod
+    def getSpeedOfObject(distance0: float, distance: float, preSpeed: float, speed: float, interval: float) -> float:
+        """
+        Calculates the speed of an object in front of the EGO vehicle.
+
+        ### Params:
+            * distance0: float, distance (m) to the object one "interval" ago
+            * distance: float, distance (m) to the object one "interval" ago
+            * preSpeedA: float, speed (m/s) of the EGO vehicle one "interval" ago
+            * speed: float, current speed (m/s) of the EGO vehicle
+            * interval: float, time (s) interval between each update
+        
+        ### Returns:
+            * float, speed (m/s) of the object in front of the EGO vehicle
+        """
+        # distanceEgo = interval * speed + 0.5 * acc * interval**2
+        distanceEgo = interval * (speed + preSpeed)/2
+        distanceObject = distanceEgo + distance - distance0
+        speedObject = distanceObject / interval
+        return round(speedObject, 3)
+
+
+    @staticmethod
+    def calculateTTC(preDistance: float, distance: float, preSpeed: float, speed: float, accA: float, interval: float) -> float:
+        """
+        Calculate time to collision when both objects can be on the move.
+
+        ### Formulas
+        d = vt + 0.5at^2\\
+        0.5at^2 + vt + (-d) = 0
+        --> t = (-v +- sqrt(v^2 - 4*0.5*a*d)) / (2 * 0.5 a)
+
+        ### NOTE
+        Maybe not necessary to use acceleration / it is more precise to not use it
+
+        ### NOTE
+        If the distance is high enough and the acceleration is negative enough, 
+        the NPC vehicle is "calculated" to have negative speed because the acceleration is constant
+
+        ### Params:
+            * preDistance: float, distance (m) to the object one "interval" ago
+            * distance: float, current distance (m) to the object
+            * preSpeedA: float, speed (m/s) of the EGO vehicle one "interval" ago
+            * speed: float, current speed (m/s) of the EGO vehicle
+            * acc: float, the EGO vehicle's acceleration (m/s^2)
+            * interval: float, time (s) interval between each update
+        
+        ### Returns:
+            * ttc: float, time (s) to collision
+        """
+        NO_COLLISION = 50
+
+        if distance >= 100:
+            return NO_COLLISION
+        if preDistance - distance > 3 * speed:
+            print("\tNEW OBJECT")
+            return NO_COLLISION
+
+        speedObject = Simulation.getSpeedOfObject(preDistance, distance, speed, preSpeed, interval)
+        relativeSpeed = speed - speedObject
+        relativeAcceleration = 0 # accA - accB # Maybe not necessary with acceleration of B
+        print(f"\nEGO: {round(speed, 2)}, object: {round(speedObject, 2)}, speed diff: {round(relativeSpeed, 2)}, dto: {distance}")
+        
+        if relativeAcceleration == 0:
+            if speed <= speedObject:
+                return NO_COLLISION
+            ttc = distance / relativeSpeed
+            return ttc if ttc <= 50 else 50
+        
+        num = relativeSpeed**2 - 4 * 0.5 * relativeAcceleration * (-distance)
+        # print(f"(-{relativeSpeed} +- sqrt({relativeSpeed}^2 - 4*0.5*{relativeAcceleration}*(-{distance}))) / 2 * 0.5 {relativeAcceleration}")
+        if num >= 0:
+            t_add = (-relativeSpeed + math.sqrt(num)) / (2*0.5*relativeAcceleration)
+            t_sub = (-relativeSpeed - math.sqrt(num)) / (2*0.5*relativeAcceleration)
+            if t_add > 0 and t_add < 50:
+                return t_add
+            elif t_sub > 0 and t_sub < 50:
+                return t_sub
+        return NO_COLLISION # Not going to collide
+
+
+    def runSimulation(self, 
+                      simDuration: float=10, 
+                      updateInterval: float=1, 
+                      window: float=0.5, model: 
+                      str="Classifier", 
+                      runScenario: int=0, 
+                      plotting: bool=True, 
+                      storePredictions: bool = False):
         """
         Run a simulation in LGSVL (OSSDC-SIM).
 
@@ -455,6 +544,7 @@ class Simulation():
         angular = [[0,0,0]]
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
+        newttc = 50
 
         
         # df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
@@ -470,7 +560,7 @@ class Simulation():
             # self.spawnNPCVehicle("Sedan", 30, 0.5, 0, True)
         else:
             print("Driving with keyboard!")
-            self.spawnNPCVehicle("Sedan", 50, 0.5, 0)
+            self.spawnNPCVehicle("Sedan", 10, 0, 0, 10, True)
         
         ### Classes
         pred = P(model)
@@ -485,14 +575,8 @@ class Simulation():
         while True:
             self.sim.run(updateInterval) # NOTE can speed up the virtual time in the simulator
             timeRan += updateInterval
-            for sensor in self.ego.get_sensors(): # maybe use __dict__ to get to the sensor immediately
-                if sensor.name == "Lidar":
-                    sensor.save(PATH + "/data/lidarUpdate.pcd") # TODO make this work on other PCs
-                    distance = lidar.updatedDTO
-                    # print(f"Lidar: {round(distance, 3)} m, speed: {round(self.ego.state.speed, 3)} m/s", end="\t")
-                    # from coordinates: {round(self.distanceToObjects[-1], 3)}, diff: {round(round(distance, 2)-round(self.distanceToObjects[-1], 2), 3)}
-                    dtoList.append(distance)
-                    break
+            self.ego.get_sensors()[2].save(PATH + "/data/lidarUpdate.pcd")
+            dtoList.append(lidar.updatedDTO)
             # Maybe use this to check distances in comparison with the lidar
             # self.getDTOs()
             speed = self.ego.state.speed
@@ -502,7 +586,7 @@ class Simulation():
 
             ### Angular
             angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
-
+            
             ### Cruise controll
             # targetSpeed = 5
             # if speed-targetSpeed > 0.5: # Drives too fast
@@ -512,12 +596,14 @@ class Simulation():
             # else:
             #     self.controls.throttle = 0
 
-            ttcList.append(round(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval), 3))
-            # print(f"TTC: {round(ttcList[-1], 2)} \t Time: {round(self.sim.current_time, 1)} \t Throttle: {round(self.controls.throttle, 1)}")
+            ### Old TTC
+            # ttcList.append(round(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval), 3))
+            if len(dtoList) > 1:
+                ttcList.append(self.calculateTTC(dtoList[-2], dtoList[-1], speeds[-1], speeds[-2], acceleration[-1], updateInterval))
 
-            ### Some nice information
+            ## Some nice information
             print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
-            
+
             ### Evasive action
             # if dtoList[-1] < 15:
             #     evasive = lidar.getEvasiveAction()
@@ -538,8 +624,7 @@ class Simulation():
                     actualCollision = 1 if self.actualCollisionTimeStamp > timeRan-updateInterval else 0
                     if len(paramsToStore) > 0: paramsToStore[-1][-1] = actualCollision
                     paramsToStore.append([ttcList[-1], dtoList[-1], round(np.average(jerk[-(6*intsPerSec)::intsPerSec]), 3)] + [i for i in speeds[-(6*intsPerSec)::intsPerSec]] + [i for xyz in angular[-(6*intsPerSec)::intsPerSec] for i in xyz] + [predictions[-1], None])
-                # if len(paramsToStore) > 1: 
-                #     print(paramsToStore[-2])
+
 
             ### Check if a collision has been predicted
             if predictions[-1] and predictions[-1] != predictions[-2]:
@@ -574,7 +659,7 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=20, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=0, plotting=True, storePredictions=True)
+    sim.runSimulation(simDuration=50, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=0, plotting=False, storePredictions=False)
 
 
 

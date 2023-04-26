@@ -18,7 +18,9 @@ class ReadLidar():
         """
         self.mid = 180
         self.vehicleHeight = 0.
-        self.ground = -2.0 # Represents the lidar z-coordinate that corresponds approximately to the ground
+        # NOTE the ground is around 2.3, but during breaking and accelerating the car is tilted
+        # which makes the ground coordinates not constant
+        self.ground = -1.9 # Represents the lidar z-coordinate that corresponds approximately to the ground
         self.window = window if window > 0 else 0.1
         self.rays = rays if rays < 32 else 32
         self.indexes = np.arange(360*rays)
@@ -76,7 +78,10 @@ class ReadLidar():
         # self.inFront = np.array([x for (x, i) in zip(self.vectorList[:360*self.rays], self.indexes) if i % 360 >= self.mid and i % 360 <= self.mid])
         # print(len(self.inFront))
         # self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 0 and y > -self.window and y < self.window])
-        self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z < self.vehicleHeight])
+
+        # self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z < self.vehicleHeight])
+        self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z > self.ground and z < self.vehicleHeight])
+
 
     def getDistanceToObstacle(self):
         """
@@ -166,20 +171,20 @@ class ReadLidar():
 
 if __name__ == "__main__":
     # lidar = ReadLidar(window=0.5, rays=20, filename=".\MasterThesis\data\\album\lidar8.pcd")
-    # lidar = ReadLidar(window=1.4, rays=35)
-    lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
+    lidar = ReadLidar(window=3, rays=35)
+    # lidar = ReadLidar(window=1.4, rays=35, filename=".\MasterThesis\data\lidar\lidar20mSedan.pcd")
     lidar.readPCD()
 
     lidar.getPointsInFront()
     print(lidar.inFront)
     lidar.vizualizePointCloud(lidar.inFront)
     # lidar.vizualizePointCloud(lidar.vectorList)
-    # closest = lidar.getDistanceToObstacle()
-    # print(lidar.getDistanceToObstacle())#, np.sqrt(closest[0]**2+closest[1]**2))
+    closest = lidar.getDistanceToObstacle()
+    print(lidar.getDistanceToObstacle())#, np.sqrt(closest[0]**2+closest[1]**2))
     # print(lidar.closestPointInFront)
     # print(lidar.inFront)
     print(lidar.updatedDTO)
-    evasive = lidar.getEvasiveAction(10)
-    print(evasive)
+    # evasive = lidar.getEvasiveAction(10)
+    # print(evasive)
 
         

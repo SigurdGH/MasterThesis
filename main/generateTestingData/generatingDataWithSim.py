@@ -91,11 +91,9 @@ class GenerateData(Simulation):
             self.sim.run(updateInterval) # NOTE can speed up the virtual time in the simulator
             timeRan += updateInterval
 
-            if storePredictions and timeRan % timeBetweenLogging == 0:
-                # print(self.ego.get_sensors()[2].name)
+            if timeRan % timeBetweenLogging == 0: # Once every second
                 self.ego.get_sensors()[2].save(PATH + "/data/lidarUpdate.pcd")
                 paramsToStore["DTO"].append(lidar.updatedDTO)
-                
                 paramsToStore["Time"].append(timeRan)
                 paramsToStore["Speed"].append(round(self.ego.state.speed, 3))
                 acceleration.append((paramsToStore["Speed"][-1]-paramsToStore["Speed"][-2])/timeBetweenLogging)
@@ -103,18 +101,20 @@ class GenerateData(Simulation):
                 paramsToStore["asX"].append(round(self.ego.state.angular_velocity.x, 3))
                 paramsToStore["asY"].append(round(self.ego.state.angular_velocity.y, 3))
                 paramsToStore["asZ"].append(round(self.ego.state.angular_velocity.z, 3))
-                paramsToStore["TTC"].append(round(self.getTTC(paramsToStore["Speed"][-1], paramsToStore["DTO"][-1], paramsToStore["DTO"][-1], timeBetweenLogging), 3))
+                if len(paramsToStore["DTO"]) > 2:
+                    paramsToStore["TTC"].append(round(self.calculateTTC(paramsToStore["DTO"][-2], 
+                                                                        paramsToStore["DTO"][-1], 
+                                                                        paramsToStore["Speed"][-1], 
+                                                                        paramsToStore["Speed"][-2], 
+                                                                        acceleration[-1], 
+                                                                        timeBetweenLogging), 3))
+                else:
+                    paramsToStore["TTC"].append(50)
                 paramsToStore["COL"].append(1 if self.actualCollisionTimeStamp > timeRan-1 else 0)
 
-                # Marks the values before the collision also as a collision, until the TTC is over 3 or up to 5 seconds before the collision
-                if self.actualCollisionTimeStamp > timeRan-1:
-                    for i, ttc in enumerate(paramsToStore["TTC"][::-1]):
-                        if i >= 6 or ttc >= 3: break
-                        paramsToStore["COL"][-i] = 1
-
-                ### Some nice information
+                ### Some nice information to the console
                 for (feature, value), metric in zip(paramsToStore.items(), metrics):
-                    if "Angular" in feature: continue
+                    if "as" in feature: continue
                     val = f"{value[-1]}{metric}".ljust(15)
                     print(f"{feature}: {val}", end="")
                 else:
