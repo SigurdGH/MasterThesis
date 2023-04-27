@@ -437,8 +437,12 @@ class Simulation():
     @staticmethod
     def getSpeedOfObject(distance0: float, distance: float, preSpeed: float, speed: float, interval: float) -> float:
         """
-        Calculates the speed of an object in front of the EGO vehicle.
-
+        Calculates the speed of an object in front of the EGO vehicle.\\
+        #### Formula:
+            * distanceEgo = interval * (speed + preSpeed)/2
+            * distanceObject = distanceEgo + distance - distance0
+            * speedObject = distanceObject / interval
+            * -> v_object = ((t * (v_ego_1 + v_ego_1)/2) + d_1 - d_0) / t
         ### Params:
             * distance0: float, distance (m) to the object one "interval" ago
             * distance: float, distance (m) to the object one "interval" ago
@@ -450,10 +454,10 @@ class Simulation():
             * float, speed (m/s) of the object in front of the EGO vehicle
         """
         # distanceEgo = interval * speed + 0.5 * acc * interval**2
-        distanceEgo = interval * (speed + preSpeed)/2
-        distanceObject = distanceEgo + distance - distance0
-        speedObject = distanceObject / interval
-        return round(speedObject, 3)
+        # distanceEgo = interval * (speed + preSpeed)/2
+        # distanceObject = distanceEgo + distance - distance0
+        # speedObject = distanceObject / interval
+        return round(((interval * (speed + preSpeed)/2) + distance - distance0) / interval, 3)
 
 
     @staticmethod
@@ -535,17 +539,15 @@ class Simulation():
             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
         """        
         ### Variables
-        ttcList = [0]
-        dtoList = [0]
-        speeds = [0]
-        acceleration = [0]
-        jerk = [0]
-        predictions = [0] * int(5 // updateInterval)
-        angular = [[0,0,0]]
+        ttcList = [50] # seconds
+        dtoList = [100] # meters
+        speeds = [0] # m/s
+        acceleration = [0] # m/s^2
+        jerk = [0] # m/s^3
+        predictions = [0] * int(5 // updateInterval) # bool, 0 or 1
+        angular = [[0,0,0]]  # m/s, m/s, m/s
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
-        newttc = 50
-
         
         # df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
         paramsToStore = []
@@ -598,8 +600,7 @@ class Simulation():
 
             ### Old TTC
             # ttcList.append(round(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval), 3))
-            if len(dtoList) > 1:
-                ttcList.append(self.calculateTTC(dtoList[-2], dtoList[-1], speeds[-1], speeds[-2], acceleration[-1], updateInterval))
+            ttcList.append(self.calculateTTC(dtoList[-2], dtoList[-1], speeds[-1], speeds[-2], acceleration[-1], updateInterval))
 
             ## Some nice information
             print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
@@ -659,170 +660,10 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=50, updateInterval=0.5, window=1.0, model="xgb_2_582-11-16-201", runScenario=0, plotting=False, storePredictions=False)
-
-
-
-
-
-##### NOTE Old runSimulation, trying threading
-# def oldRunSimulation(self, simDuration: float=10, updateInterval: float=1, plotting: bool=True):
-#         """
-#         Run simulation in LGSVL (OSSDC-SIM).
-#         NOTE OLD
-#         ### Params:
-#             * simDuration: float, time (seconds) for simulation duration
-#             * updateInterval: float, time (seconds) between each data logging
-#             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
-#         """        
-        
-#         # self.changeTimeAndWeather(time=15, rain=0.4, fog=0.6, damage=0.2)
-#         self.changeScenario("sunny_night")
-#         # self.spawnNPCVehicle("Sedan", 50, 0, speed=0)
-#         # self.spawnNPCVehicle("SchoolBus", 10, -10)
-#         # self.spawnNPCVehicle("BoxTruck", 20, speed=0)
-#         # self.spawnNPCVehicle("Sedan", 20, -3,speed=22)
-#         # self.otherAgents[0].follow_closest_lane(True, 5)
-
-#         # self.simpleScenario()
-        
-#         self.controls.headlights = 0
-
-#         # Both of these are seconds
-#         timeRan = 0
-#         lastCollision = -100
-
-#         intsPerSec = int(1//updateInterval)
-#         print(f"Updating {intsPerSec} times per second!")
-
-#         dtoList = [0]
-#         speeds = [0]
-#         acceleration = [0]
-#         jerk = [0]
-#         predictions = [0] * int(5 // updateInterval)
-        
-#         angular = [[0,0,0]]
-
-#         pred = P("Classifier")
-
-#         lidar = ReadLidar(0, 20, ".\MasterThesis\data\lidarUpdate.pcd")
-
-#         # pred = P("MLPClassifier_1952-26-51-181") # ttc, dto, jerk, speed1-6, a1x, a1y, a1z, a2x...
-
-
-#         # def forThreading(ttc, jerk, speeds):
-#         #     self.getDTOs()
-#         #     dtoList.append(self.distanceToObjects[0]-4.77)
-#         #     predictions.append(pred.predict(ttc, dtoList[-1], jerk, speeds))
-
-#         #     if predictions[-1] and predictions[-1] != predictions[-2]:
-#         #         lastCollision = timeRan
-#         #     self.isColliding(lastCollision, timeRan)
-
-#         oldControls = copy(self.controls.__dict__)
-#         self.ego.apply_control(self.controls, False)
-#         # t = None
-#         notSaved = False
-#         while True:
-            
-#             self.sim.run(updateInterval)
-#             timeRan += updateInterval
-
-#             # if timeRan > 1 and not notSaved:
-#             #     notSaved = True
-#             #     for sensor in self.ego.get_sensors():
-#             #         # print(sensor.name, end=", ")
-#             #         # print(sensor.__dict__)
-#             #         # print(sensor.enabled)
-#             #         if sensor.name == "Lidar":
-#             #             print("Saving lidar")
-#             #             sensor.save("C:/MasterFiles/MasterThesis/data/lidarNoCars.pcd")
-#             #             print(f"min_distance: {sensor.min_distance}")
-#             #             print(f"max_distance: {sensor.max_distance}")
-#             #             print(f"rays: {sensor.rays}")
-#             #             print(f"rotations: {sensor.rotations}") # rotation frequency, Hz
-#             #             print(f"measurements: {sensor.measurements}") # = j["measurements"]  # how many measurements each ray does per one rotation
-#             #             print(f"fov: {sensor.fov}")
-#             #             print(f"angle: {sensor.angle}")
-#             #             print(f"compensated: {sensor.compensated}")
-
-
-#             for sensor in self.ego.get_sensors():
-#                 if sensor.name == "Lidar":
-#                     # print("Saving lidar")
-#                     sensor.save("C:/MasterFiles/MasterThesis/data/lidarUpdate.pcd")
-#                     # lidar.readPCD(".\MasterThesis\data\lidarUpdate.pcd")
-#                     # lidar.getPointsInFront()
-#                     distance = lidar.updatedDTO
-#                     if distance < 5:
-#                         sensor.save("C:/MasterFiles/MasterThesis/data/lidarSkewed.pcd")
-#                     print(f"Distance: {distance} m(?), speed: {round(self.ego.state.speed, 3)} m/s")
-#                     dtoList.append(distance)
-#                     break
-
-#             # if isinstance(t, Thread):
-#             #     t.join()
-#             # t = Thread(target=self.sim.run, args=updateInterval)
-#             # t.start()
-
-#             # self.getDTOs()
-
-#             # print(f"Angular velocity: x: {self.ego.state.angular_velocity.x},  y: {self.ego.state.angular_velocity.y},  z: {self.ego.state.angular_velocity.z}")
-#             # dtoList.append(self.distanceToObjects[0]-4.77) # NOTE 4.77 is probably the distance between a position and length of a vehicle
-#             speed = self.ego.state.speed
-#             speeds.append(round(speed, 3))
-#             acceleration.append((speeds[-1]-speeds[-2])/updateInterval)
-#             jerk.append((acceleration[-1]-acceleration[-2])/updateInterval)
-
-#             # Angular
-#             angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
-
-#             # print(f"Speed: {round(speeds[-1], 2)} m/s")
-#             # print(f"Acceleration: {round(acceleration[-1], 2)} m/s^2")
-#             # print(f"Jerk: {round(jerk[-1], 2)} m/s^3")
-#             # print(self.distanceToObjects[0], 5 // updateInterval)
-#             if len(speeds) > 5 // updateInterval:
-#                 # t = Thread(target=forThreading, args=(20, np.average(jerk[-(6):]), speeds[-(6*intsPerSec)::intsPerSec]))
-#                 # t.start()
-#                 predictions.append(pred.predict(ttc=20, dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec]))
-#                 # predictions.append(pred.predict(dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
-            
-#             # NOTE: can maybe make it more abstract
-#             if predictions[-1] and predictions[-1] != predictions[-2]:
-#                 print("A COLLISION IS GOING TO HAPPEN!")
-#                 lastCollision = timeRan
-#             self.isColliding(lastCollision, timeRan)#, predictions[-1], predictions[-2])
-
-
-#             if self.controls.__dict__ != oldControls: # Only applies new controls if something has changed
-#                 oldControls = copy(self.controls.__dict__)
-#                 self.ego.apply_control(self.controls, True)
-
-#             if timeRan > simDuration:
-#                 # if isinstance(t, Thread):
-#                 #     t.join()
-#                 self.sim.stop()
-#                 break
-
-#         if plotting:
-#             plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList)
-#####
-
-# s = ScenarioRunner()
-# s.load_scenario_file(scenario_filepath_or_buffer=file)
-# print(s.get_entities_info())
-
-# s = lgsvl.scenariotoolset.ScenarioRunner()
-# s.load_scenario_file(scenario_filepath_or_buffer=file)
-# # print(s.get_scene_by_timestep(timestep=21))
-
-# for i in range(7): print(s.get_scene_by_timestep(timestep=i))
-
-# NOTE Runs the simulator from sce
-# runner = lgsvl.scenariotoolset.ScenarioRunner()
-# runner.load_scenario_file(scenario_filepath_or_buffer=file)
-# # runner.load_scenario_file(scenario_filepath_or_buffer='./deepscenario/overtake.deepscenario')
-# runner.connect_simulator_ads(simulator_port=8181, bridge_port=9090)
-# runner.run(mode=0) # mode=0: disable ADSs; mode=1: enable ADSs
-
-
+    sim.runSimulation(simDuration=50,
+                      updateInterval=0.5,
+                      window=1.0,
+                      model="xgb_2_582-11-16-201",
+                      runScenario=0,
+                      plotting=False,
+                      storePredictions=False)

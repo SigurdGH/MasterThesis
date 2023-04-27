@@ -51,7 +51,7 @@ class GenerateData(Simulation):
                 print("created a new file and added it there.")
 
 
-    def generateDataWithSim(self, simDuration: float=10, updateInterval: float=1, window: float=0.5):
+    def generateDataWithSim(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, storeData: bool=True):
         """
         ### NOTE should maybe store the average value from the last second?
         Run the simulation and driving with the keyboard.\\
@@ -62,12 +62,12 @@ class GenerateData(Simulation):
             * simDuration: float, time (seconds) for simulation duration
             * updateInterval: float, time (seconds) between each data logging
             * window: float, distance (meters) left/right the algorithm should look for obstacles
+            * storeData: bool, True if the data should be stored
         """
         acceleration = [0]
         timeRan = 0 # seconds
         timeBetweenLogging = 1 # seconds
 
-        storePredictions = True
         paramsToStore = {"Time": [0],
                          "TTC": [0],
                          "DTO": [0],
@@ -101,15 +101,12 @@ class GenerateData(Simulation):
                 paramsToStore["asX"].append(round(self.ego.state.angular_velocity.x, 3))
                 paramsToStore["asY"].append(round(self.ego.state.angular_velocity.y, 3))
                 paramsToStore["asZ"].append(round(self.ego.state.angular_velocity.z, 3))
-                if len(paramsToStore["DTO"]) > 2:
-                    paramsToStore["TTC"].append(round(self.calculateTTC(paramsToStore["DTO"][-2], 
-                                                                        paramsToStore["DTO"][-1], 
-                                                                        paramsToStore["Speed"][-1], 
-                                                                        paramsToStore["Speed"][-2], 
-                                                                        acceleration[-1], 
-                                                                        timeBetweenLogging), 3))
-                else:
-                    paramsToStore["TTC"].append(50)
+                paramsToStore["TTC"].append(round(self.calculateTTC(paramsToStore["DTO"][-2], 
+                                                                    paramsToStore["DTO"][-1], 
+                                                                    paramsToStore["Speed"][-1], 
+                                                                    paramsToStore["Speed"][-2], 
+                                                                    acceleration[-1], 
+                                                                    timeBetweenLogging), 3))
                 paramsToStore["COL"].append(1 if self.actualCollisionTimeStamp > timeRan-1 else 0)
 
                 ### Some nice information to the console
@@ -124,14 +121,14 @@ class GenerateData(Simulation):
                 self.sim.stop()
                 break
 
-        if storePredictions:
+        if storeData:
             self.storeDataGenerated(paramsToStore, True)
 
 
 if __name__ == "__main__":
     sim = GenerateData("sf")
     sim.spawnRandomNPCs(amountVehicles=30, amountPedestrians=10)
-    sim.generateDataWithSim(simDuration=60, updateInterval=0.5, window=1.0)
+    sim.generateDataWithSim(simDuration=300, updateInterval=1, window=1.0, storeData=True)
 
 
 
