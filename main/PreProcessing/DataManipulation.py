@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import random
 
 class DataManipulation():
     def __init__(self, filename: str=""):
@@ -30,7 +31,38 @@ class DataManipulation():
         angular_velocities = self._data[av].apply(lambda x: list(map(float, sum(map(lambda y: y.strip("[]").split(","), x.values), []))), axis=1)
         self._data[av_] = angular_velocities.values.tolist()
         self._data = self._data.drop(av, axis=1)
-                
+    
+    def UpdateSpeedAtCollision(self):
+        random.seed(1)
+        res = self._data.copy()
+
+        # for each row, get the SAC value, and the speed columns that the SAC value falls in between 
+        # and update the following speed columns with a random value between 0 and the speed value
+        SAC = "Attribute[SAC]"
+        speeds = [f"speed{i}" for i in range(1,7)]
+
+        for idx, row in self._data.loc[self._data["Attribute[COL]"] == True].iterrows():
+            _sac = row[SAC]
+            for speed_idx, speed in enumerate(speeds):
+                if speed_idx + 1 == len(speeds):
+                    break
+                if _sac >= row[speed] and _sac <= row[speeds[speed_idx+1]]:
+                    prev = res.loc[idx, speeds[speed_idx:]].values.tolist()
+                    res.loc[idx, speeds] = [prev[0] + random.uniform(-1, row[speed] / 10) for _ in range(0, len(speeds)- len(prev))] + prev
+                    break
+        
+        inc_fac = 1.2
+        # increase all speed columns by 10% (where collision occured)
+        res.loc[res["Attribute[COL]"] == True, speeds] = res.loc[res["Attribute[COL]"] == True, speeds].values * inc_fac
+        
+        # we will also increase the Attribute[DTO] by 10% (where collision occured)
+        # res.loc[res["Attribute[COL]"] == True, "Attribute[DTO]"] = res.loc[res["Attribute[COL]"] == True, "Attribute[DTO]"].values * inc_fac
+
+        distance_inc = 3
+        # we also need to make sure that the Attribute[DTO] is at least 3 meters. So if it is less than 3, we will increase it by 3 + random.uniform(0, 1) + original value
+        condition = (res["Attribute[DTO]"] <= 10) #& (res["speed6"] >= 10)
+        res.loc[condition, "Attribute[DTO]"] = res.loc[condition, "Attribute[DTO]"].values + distance_inc + random.uniform(0, 1)
+        self._data = res
 
     def addFromXML(self, filename: str="") -> None:
         """
@@ -46,6 +78,7 @@ class DataManipulation():
         if isinstance(self.data, pd.DataFrame):
             self._data = self.data.merge(xmlDf, how="inner", on=["ScenarioID", "road", "reward", "scenario", "strategy"], copy=False)
             self.ExtractAvData()
+            self.UpdateSpeedAtCollision()
         else:
             print("Something went wrong in 'addFromXML()'!")
 
@@ -77,18 +110,20 @@ class DataManipulation():
 
         trainX, testX = temp[:split], temp[split:]
 
-        trainY = pd.concat([trainX.pop(feature) for feature in ["Attribute[COL]","Attribute[COLT]","Attribute[SAC]"]], axis=1)
-        testY = pd.concat([testX.pop(feature) for feature in ["Attribute[COL]","Attribute[COLT]","Attribute[SAC]"]], axis=1)
+        exclude_cols = ["Attribute[COL]","Attribute[COLT]","Attribute[SAC]", "Attribute[TTC]"] # TTC is entirely correlated with COL, need to remove it.
+
+        trainY = pd.concat([trainX.pop(feature) for feature in exclude_cols], axis=1)
+        testY = pd.concat([testX.pop(feature) for feature in exclude_cols], axis=1)
 
         return trainX, trainY, testX, testY
 
     def underSample(self, sampleSize: int=1000):
-        self._data = pd.concat([self._data[self._data["Attribute[COL]"] == False].sample(sampleSize), self._data[self._data["Attribute[COL]"] == True]])
+        self._data = pd.concat([self._data[self._data["Attribute[COL]"] == False].sample(sampleSize, random_state=1), self._data[self._data["Attribute[COL]"] == True]])
     
     def overSample(self, sampleSize: int=1000):
         colition_df = self._data[self._data["Attribute[COL]"] == True]
         # add more samples to the collision data (duplicate)
-        self._data = pd.concat([self._data, colition_df.sample(sampleSize, replace=True)])
+        self._data = pd.concat([self._data, colition_df.sample(sampleSize, random_state=1, replace=True)])
 
     def getCompleteRow(self, index: None):
         """
