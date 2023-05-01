@@ -100,7 +100,7 @@ class NewPredicter(Predicter):
         # self.scaler = preprocessing.StandardScaler()
         # self.numberOfFeatures = 0
         # self.pickled_model = None
-        print(f"amount of features: {self.numberOfFeatures}")
+        # print(f"amount of features: {self.numberOfFeatures}")
         
 
     def preProcess(self, x: DataFrame) -> np.array:
@@ -252,13 +252,17 @@ if __name__ == "__main__":
     # print(p.__dict__)
 
     p = NewPredicter()
-    trainX = p.preProcess(trainX)
-    trainY = trainY.to_numpy()
+    trainXpp = p.preProcess(trainX)
+    trainYpp = trainY.to_numpy()
+    testXpp = p.preProcess(testX)
+    testYpp = testY.to_numpy()
+    print(f"trainX: {type(trainXpp)}, trainY: {type(trainYpp)}, testX: {type(testXpp)}, testY: {type(testYpp)}")
+    # print(trainXpp)
+    p.fit(trainXpp, trainYpp)
 
-    testX = p.preProcess(testX)
-    testY = trainY.to_numpy()
+    pred = []
+    for i in range(len(testX)):
+        pred.append(p.predict(testX.iloc[i]))
+    print(pred)
 
-    print(testX)
-    p.fit(trainX, trainY)
-
-    # p.predict([])
+    p.getScore(pred, testY)
