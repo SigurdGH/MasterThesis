@@ -10,6 +10,8 @@ import random
 import math
 import pickle
 from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
+
 from sklearn import preprocessing
 
 from main.ML.Model import Predicter
@@ -164,9 +166,9 @@ class NewPredicter(Predicter):
 
         """
         # print("Nye predict")
-        if len(x) != self.numberOfFeatures:
-            print(f"Wrong amount of features!, got {len(x)}, need to have {self.numberOfFeatures}")
-            return None
+        # if len(x) != self.numberOfFeatures:
+        #     print(f"Wrong amount of features!, got {len(x)}, need to have {self.numberOfFeatures}")
+        #     return None
         
         # x = np.array([20, 20, 1, 2, 1,1,2,3,4,5,6])
         # if len(angular) < 6:
@@ -174,14 +176,14 @@ class NewPredicter(Predicter):
         # else:
         #     x = [dto, jerk] + speeds + np.array(angular).flatten().tolist()
         # print(f"Inne i predict: {x}")
-        xProcessed = self.preProcess(x)
+        # xProcessed = self.preProcess(x)
         # print(f"x: {x}\t\tprocessed: {xProcessed}")
         # prediction = self.predict(xProcessed)[0]
-        prediction = self.model.predict(xProcessed)[0]
+        prediction = self.model.predict(x)
         return prediction
 
 
-    def getScore(self, predictions, truth):
+    def getScore(self, y, y_pred):
         """"
         Shows the score of given predictions and ground truth in a confusion matrix.
         
@@ -197,24 +199,12 @@ class NewPredicter(Predicter):
         Returns:
             cm: list[list]
         """
-        # truthProcessed = self.preProcess(truth)
-        truthProcessed = truth
-        tot = 0
-        cm = [[0, 0], [0, 0]]
-        col = np.count_nonzero(truthProcessed == 1)
-        
-        for p, t in zip(predictions, truthProcessed):
-            cm[int(t)][int(p)] += 1
-            tot += 1
-
-        prec = cm[1][1]/(cm[0][1]+cm[1][1])
-        rec = cm[1][1]/(cm[1][1]+cm[1][0])
-        print(f"Total: {tot}, number of collisions: {col}")
-        print(f"\tTN: {cm[0][0]} \t| FP: {cm[0][1]} \n\tFN: {cm[1][0]} \t| TP: {cm[1][1]}")
-        print(f"Accuracy: {round((cm[0][0]+cm[1][1])/(cm[0][0]+cm[0][1]+cm[1][0]+cm[1][1]), 2)}")
-        print(f"Precision: {round(prec, 2)}")
-        print(f"Recall: {round(rec, 2)}")
-        print(f"F1: {round(2*prec*rec/(prec+rec), 2)}")
+        acc, prec, rec, f1 = accuracy_score(y, y_pred), precision_score(y, y_pred), recall_score(y, y_pred), f1_score(y, y_pred)
+        cm = confusion_matrix(y, y_pred)
+        print(f"Total: {len(y)}, Collisions: {np.count_nonzero(y)}")
+        print(f"Accuracy: {acc}, Precision: {prec}, Recall: {rec}, F1: {f1}")
+        print("Confusion matrix:")
+        print(cm)
         return cm
 
 
