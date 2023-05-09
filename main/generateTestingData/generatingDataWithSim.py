@@ -4,7 +4,7 @@ import lgsvl
 from pandas import DataFrame, read_csv, concat
 
 PATH = os.path.abspath(__file__)
-PATH = PATH[:PATH[:PATH[:PATH.rfind("\\")].rfind("\\")].rfind("\\")]
+PATH = PATH[:PATH.find("main")-1]
 sys.path.insert(0, PATH)
 
 from main.readLidar import ReadLidar
@@ -66,7 +66,6 @@ class GenerateData(Simulation):
         """
         acceleration = [0]
         timeRan = 0 # seconds
-        timeBetweenLogging = 1 # seconds
 
         paramsToStore = {"Time": [0],
                          "TTC": [0],
@@ -91,31 +90,30 @@ class GenerateData(Simulation):
             self.sim.run(updateInterval) # NOTE can speed up the virtual time in the simulator
             timeRan += updateInterval
 
-            if timeRan % timeBetweenLogging == 0: # Once every second
-                self.ego.get_sensors()[2].save(PATH + "/data/lidarUpdate.pcd")
-                paramsToStore["DTO"].append(lidar.updatedDTO)
-                paramsToStore["Time"].append(timeRan)
-                paramsToStore["Speed"].append(round(self.ego.state.speed, 3))
-                acceleration.append((paramsToStore["Speed"][-1]-paramsToStore["Speed"][-2])/timeBetweenLogging)
-                paramsToStore["JERK"].append(round(abs((acceleration[-1]-acceleration[-2])/timeBetweenLogging), 3))
-                paramsToStore["asX"].append(round(self.ego.state.angular_velocity.x, 3))
-                paramsToStore["asY"].append(round(self.ego.state.angular_velocity.y, 3))
-                paramsToStore["asZ"].append(round(self.ego.state.angular_velocity.z, 3))
-                paramsToStore["TTC"].append(round(self.calculateTTC(paramsToStore["DTO"][-2], 
-                                                                    paramsToStore["DTO"][-1], 
-                                                                    paramsToStore["Speed"][-1], 
-                                                                    paramsToStore["Speed"][-2], 
-                                                                    acceleration[-1], 
-                                                                    timeBetweenLogging), 3))
-                paramsToStore["COL"].append(1 if self.actualCollisionTimeStamp > timeRan-1 else 0)
+            self.ego.get_sensors()[2].save(PATH + "/data/lidarUpdate.pcd")
+            paramsToStore["DTO"].append(lidar.updatedDTO)
+            paramsToStore["Time"].append(timeRan)
+            paramsToStore["Speed"].append(round(self.ego.state.speed, 3))
+            acceleration.append((paramsToStore["Speed"][-1]-paramsToStore["Speed"][-2])/updateInterval)
+            paramsToStore["JERK"].append(round(abs((acceleration[-1]-acceleration[-2])/updateInterval), 3))
+            paramsToStore["asX"].append(round(self.ego.state.angular_velocity.x, 3))
+            paramsToStore["asY"].append(round(self.ego.state.angular_velocity.y, 3))
+            paramsToStore["asZ"].append(round(self.ego.state.angular_velocity.z, 3))
+            paramsToStore["TTC"].append(round(self.calculateTTC(paramsToStore["DTO"][-2], 
+                                                                paramsToStore["DTO"][-1], 
+                                                                paramsToStore["Speed"][-1], 
+                                                                paramsToStore["Speed"][-2], 
+                                                                acceleration[-1], 
+                                                                updateInterval), 3))
+            paramsToStore["COL"].append(1 if self.actualCollisionTimeStamp > timeRan-1 else 0)
 
-                ### Some nice information to the console
-                for (feature, value), metric in zip(paramsToStore.items(), metrics):
-                    if "as" in feature: continue
-                    val = f"{value[-1]}{metric}".ljust(15)
-                    print(f"{feature}: {val}", end="")
-                else:
-                    print()
+            ### Some nice information to the console
+            for (feature, value), metric in zip(paramsToStore.items(), metrics):
+                if "as" in feature: continue
+                val = f"{value[-1]}{metric}".ljust(15)
+                print(f"{feature}: {val}", end="")
+            else:
+                print()
 
             if timeRan > simDuration:
                 self.sim.stop()
@@ -127,8 +125,8 @@ class GenerateData(Simulation):
 
 if __name__ == "__main__":
     sim = GenerateData("sf")
-    sim.spawnRandomNPCs(amountVehicles=30, amountPedestrians=10)
-    sim.generateDataWithSim(simDuration=300, updateInterval=1, window=1.0, storeData=True)
+    sim.spawnRandomNPCs(amountVehicles=20, amountPedestrians=0)
+    sim.generateDataWithSim(simDuration=20, updateInterval=0.5, window=1.0, storeData=True)
 
 
 
