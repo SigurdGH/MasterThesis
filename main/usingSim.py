@@ -85,43 +85,9 @@ def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto,
     plt.grid()
     plt.title("Speed, DTO and collision prediction")
 
+    # TODO plot med col, pred col, accelation ++
+
     plt.show()
-
-
-# class P():
-#     def __init__(self, filename) -> None:
-#         self.model = Predicter()
-#         self.model.loadModel(filename)
-#         self.translate = {1: "You are going to crash!", 0: "Not crashing!"}
-
-#     def predict(self, ttc=20, dto=20, jerk=0, speeds=[0,0,0,0,0,0], angular=[]):
-#         """
-#         Used to predict: [TTC, DTO, Jerk, road, scenario, speed1, speed2, speed3, speed4, speed5, speed6]
-
-#         TODO
-#         Make sure the values are correct.
-#         Make it so prediction only takes from each second, if updateInterval is lower then 1.
-
-#         Attribute[TTC]	Attribute[DTO]	Attribute[Jerk]	reward	road	strategy	scenario	speed1	speed2	speed3	speed4	speed5	speed6
-#         100000.000000	6.434714	5.04	ttc	road2	random	rain_night	5.547	4.660	4.401	4.228	3.986	3.746
-        
-#         ### Params
-#             ...
-
-#         """
-#         # x = np.array([20, 20, 1, 2, 1,1,2,3,4,5,6])
-#         if len(angular) < 6:
-#             x = [ttc, dto, jerk] + speeds
-#         else:
-#             x = [dto, jerk] + speeds + np.array(angular).flatten().tolist()
-#         # print(f"Inne i predict: {x}")
-#         xP, _ = self.model.preProcess(x)
-#         # print(f"x: {x}\t\tprocessed: {xP[0]}")
-#         prediction = self.model.predict(xP)[0]
-#         # return self.translate[prediction]
-#         return prediction
-        
-
 
 
 class Simulation():
@@ -370,9 +336,9 @@ class Simulation():
         # self.otherAgents[0].change_lane(False)
 
 
-    def isColliding(self, lastCollision: float=0.0, now: float=0.0):
+    def isColliding(self, lastCollision: float=0.0, now: float=0.0, brakeOnCol: bool=False):
         """
-        Turns on warning hazards for 5 seconds when a crash is predicted and applies the brakes.
+        Turns on warning hazards for 2 seconds when a crash is predicted and applies the brakes.
 
         NOTE: Could maybe make it more abstract in 'run' by implementing this?
         if predictions[-1] and predictions[-1] != predictions[-2]:
@@ -380,14 +346,18 @@ class Simulation():
 
         self.isColliding(lastCollision, timeRan, predictions[-1], predictions[-2])
         """
-        if now-lastCollision > 5:
+        if now-lastCollision > 4:
             self.controls.braking = 0
             self.controls.turn_signal_left = False
             self.controls.turn_signal_right = False
+            if brakeOnCol:
+                self.ego.apply_control(self.controls, False)
         else:
             self.controls.braking = 1
             self.controls.turn_signal_left = True
             self.controls.turn_signal_right = True
+            if brakeOnCol:
+                self.ego.apply_control(self.controls, True)
 
 
     def getDTOsFromCoordinates(self):
@@ -528,7 +498,8 @@ class Simulation():
                       runScenario: int=0, 
                       plotting: bool=True, 
                       storePredictions: bool = False,
-                      useGeneratedData: bool=True):
+                      useGeneratedData: bool=True,
+                      brakeOnCol: bool=False):
         """
         Run a simulation in LGSVL (OSSDC-SIM).
 
@@ -547,7 +518,7 @@ class Simulation():
         speeds = [0] # m/s
         acceleration = [0] # m/s^2
         jerk = [0] # m/s^3
-        predictions = [0] * int(5 // updateInterval) # bool, 0 or 1
+        predictions = [0] * int(5) # bool, 0 or 1
         angular = [[0,0,0]]  # m/s, m/s, m/s
         angularX = [0] # m/s
         angularY = [0] # m/s
@@ -621,13 +592,13 @@ class Simulation():
             #     evasive = lidar.getEvasiveAction()
             #     evasiveDict = {1: "LEFT", -1: "RIGHT"}
             #     print(f"Turn {evasiveDict[evasive]} to avoid a potential collision!")
-                # self.controls.steering = -evasive/4
-                # self.controls.braking = 1
+            #     self.controls.steering = -evasive/4
+            #     self.controls.braking = 1
             # else:
             #     self.controls.steering = 0
 
             ### Starts the collision prediction
-            if (timeRan//updateInterval >= pastImportance) or (len(speeds) > 5 // updateInterval):
+            if (timeRan//updateInterval >= pastImportance and useGeneratedData) or (len(speeds) > 5):
             # if len(speeds) > 2 // updateInterval:
                 # predictions.append(pred.predict(ttc=ttcList[-1], dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerHalfSec)::intsPerHalfSec]))
                 if useGeneratedData:
@@ -638,10 +609,18 @@ class Simulation():
                     # print(row)
                     predictions.append(predicter.predict(predicter.preProcess(row)))
                 else:
-                    predictions.append(predicter.predict(dto=dtoList[-1], 
-                                                    jerk=round(np.average(jerk[-(6*intsPerHalfSec)::intsPerHalfSec]), 3), 
-                                                    speeds=speeds[-(6*intsPerHalfSec)::intsPerHalfSec], 
-                                                    angular=angular[-(6*intsPerHalfSec)::intsPerHalfSec]))
+                    row = [dtoList[-1], round(np.average(jerk[-(6*intsPerHalfSec)::intsPerHalfSec]), 3)] \
+                        + speeds[-(6*intsPerHalfSec)::intsPerHalfSec] + \
+                            angularX[-(6*intsPerHalfSec)::intsPerHalfSec] + \
+                                angularY[-(6*intsPerHalfSec)::intsPerHalfSec] + \
+                                    angularZ[-(6*intsPerHalfSec)::intsPerHalfSec]
+                    # print(row)
+                    row = predicter.preProcess(row)[0]
+                    predictions.append(predicter.predict(row))
+                    # predictions.append(predicter.predict(dto=dtoList[-1], 
+                    #                                 jerk=round(np.average(jerk[-(6*intsPerHalfSec)::intsPerHalfSec]), 3), 
+                    #                                 speeds=speeds[-(6*intsPerHalfSec)::intsPerHalfSec], 
+                    #                                 angular=angular[-(6*intsPerHalfSec)::intsPerHalfSec]))
 
                 if storePredictions:
                     # TODO Make it so the last x before an actual collision also is 1?
@@ -656,7 +635,8 @@ class Simulation():
                 lastCollision = timeRan
 
             ### Turns on hazards and applies the brakes
-            self.isColliding(lastCollision, timeRan)
+            # self.isColliding(lastCollision, timeRan, (runScenario == 0 and brakeOnCol))
+            self.controls.braking = 1 if predictions[-1] or predictions[-2] or predictions[-3] else 0
 
             ### Only applies new controls if something has changed
             if self.controls.__dict__ != oldControls and bool(runScenario):
@@ -671,15 +651,6 @@ class Simulation():
             self.writeParameters(paramsToStore, True)
 
         if plotting:
-            print(len(speeds))
-            print(len(acceleration))
-            print(len(jerk))
-            print(len(predictions))
-            # print(len(simDuration))
-            # print(len(updateInterval))
-            print(len(dtoList))
-            print(len(ttcList))
-
             plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList)
 
 
@@ -690,11 +661,14 @@ if __name__ == "__main__":
     sim.runSimulation(simDuration=15,
                       updateInterval=0.5,
                       window=1.0,
-                      model = "MLPClassifierWithGeneratedData",
-                    #   model = "xgb_gen_438-6-20-10",
+                    #   model = "MLPClassifierWithGeneratedData",
+                    #   model = "xgb_gen_30-9-11-27",
+                    #   model = "xgb_gen_55-16-20-59",
+                      model = "xgb_gen_80-15-37-65",
                     #   model="xgb_2_582-11-16-201", # NOTE må bruke ny modell
-                      runScenario=0,
+                      runScenario=1,
                       plotting=True,
                       storePredictions=False,
-                      useGeneratedData=True)
+                      useGeneratedData=True,
+                      brakeOnCol=True)
     
