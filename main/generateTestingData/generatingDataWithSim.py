@@ -31,7 +31,7 @@ class GenerateData(Simulation):
             self.sim.add_random_agents(lgsvl.AgentType.PEDESTRIAN)
 
 
-    def storeDataGenerated(self, paramsToStore: dict, write: bool=True):
+    def storeDataGenerated(self, paramsToStore: dict, filename: str="generatedData", write: bool=True):
         """
         Stores the generated data in a csv-file, creates a new one if it does not exist.\\
         
@@ -40,18 +40,19 @@ class GenerateData(Simulation):
         """
         print("Storing the generated data, ", end="")
         df = DataFrame(paramsToStore)
+        file = PATH+"/data/"+{filename}+".csv"
         if write:
             try:
-                oldDF = read_csv(PATH+"/data/testGenerateData.csv")
+                oldDF = read_csv(file)
                 writeDF = concat([oldDF, df])
-                writeDF.to_csv(PATH+"/data/testGenerateData.csv", index=False)
+                writeDF.to_csv(file, index=False)
                 print("added it to the file.")
             except:
-                df.to_csv(PATH+"/data/testGenerateData.csv", index=False)
+                df.to_csv(file, index=False)
                 print("created a new file and added it there.")
 
 
-    def generateDataWithSim(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, storeData: bool=True):
+    def generateDataWithSim(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, filename: str="generatedData", storeData: bool=True):
         """
         ### NOTE should maybe store the average value from the last second?
         Run the simulation and driving with the keyboard.\\
@@ -77,7 +78,7 @@ class GenerateData(Simulation):
                          "asZ": [0],
                          "COL": [0]}
 
-        metrics = [" s", " s", " m", " m/s^3", " m/s", " m/s", " m/s", " m/s", ""]
+        metrics = ["s", "s", "m", "m/s^3", "m/s", "m/s", "m/s", "m/s", ""]
 
         self.changeTimeAndWeather(6)
 
@@ -110,8 +111,7 @@ class GenerateData(Simulation):
             ### Some nice information to the console
             for (feature, value), metric in zip(paramsToStore.items(), metrics):
                 if "as" in feature: continue
-                val = f"{value[-1]}{metric}".ljust(15)
-                print(f"{feature}: {val}", end="")
+                print(f"{feature}: {value[-1]} {metric}".ljust(22), end="")
             else:
                 print()
 
@@ -120,13 +120,13 @@ class GenerateData(Simulation):
                 break
 
         if storeData:
-            self.storeDataGenerated(paramsToStore, True)
+            self.storeDataGenerated(paramsToStore, filename, True)
 
 
 if __name__ == "__main__":
     sim = GenerateData("sf")
-    sim.spawnRandomNPCs(amountVehicles=20, amountPedestrians=0)
-    sim.generateDataWithSim(simDuration=20, updateInterval=0.5, window=1.0, storeData=True)
+    sim.spawnRandomNPCs(amountVehicles=20, amountPedestrians=10)
+    sim.generateDataWithSim(simDuration=900, updateInterval=0.5, window=1.0, filename="generatedData", storeData=False)
 
 
 

@@ -1,7 +1,7 @@
 import os
 import sys
 PATH = os.path.abspath(__file__)
-PATH = PATH[:PATH[:PATH[:PATH.rfind("\\")].rfind("\\")].rfind("\\")]
+PATH = PATH[:PATH.find("main")-1]
 sys.path.insert(0, PATH)
 
 from pandas import DataFrame, Series, read_csv
@@ -18,44 +18,55 @@ from main.ML.Model import Predicter
 from main.readLidar import ReadLidar
 
 
-def makeDataUsable(df: DataFrame, pastImportance: int=6, secBeforeCol: int=3) -> DataFrame:
+def makeDataUsable(df: DataFrame, pastImportance: int=6, rowsBeforeCol: int=3, removeCol: bool=True) -> DataFrame:
     """
     Make a usable Dataframe from a csv file from generated data.\\
     Creates pastImportance of columns for each prediction feature.\\
-    Registers the "col" feature before an actual collision as 1, up to secBeforeCol back in time.
+    Registers the "col" feature before an actual collision as 1, up to secBeforeCol back in time.\\
+    If undersampleRatio is > 0, it will under sample the data, if it is 0, it will not.
     
     ### Params:
         * df: Dataframe, need to have the columns named "TTC", "DTO", "JERK" and "Speed"ArithmeticError
         * pastImportance: int, needs to be > 0
-        * secBeforeCol: int, needs to be > 0
+        * rowsBeforeCol: int, needs to be > 0
+        * removeCol: bool, True if the origianl collision row should be removed
     ### Returns:
         * Dataframe
     """
     colsToUse = ["TTC", "DTO", "JERK", "Speed", "asX", "asY", "asZ"]
     columns = ["Time"]
     columns += [f"{c}{i}" for c in colsToUse for i in range(1, pastImportance+1)]
-    columns += ["COL"]
+    columns += ["COL", "toRemove"]
 
+    rowsToRemove = []
+    
     dataDict = {col: [] for col in columns}
 
     for i, row in df.iterrows():
         if row["Time"] < pastImportance-1:
             continue
+
         dataDict["Time"].append(row["Time"])
         for j, k in enumerate(range(i-pastImportance+1, i+1), start=1):
             for c in colsToUse:
+                # Should be able to remove this if check with new data
+                if (c == "TTC" or c == "DTO") and df.iloc[k][c] < 0:
+                    dataDict[f"{c}{j}"].append(0)
+                    continue
                 dataDict[f"{c}{j}"].append(df.iloc[k][c])
 
-        dataDict[f"COL"].append(row["COL"])
+        dataDict["COL"].append(row["COL"])
+        dataDict["toRemove"].append(row["COL"])
         if row["COL"] == 1:
+            rowsToRemove.append(i-1)
             available = int(row["Time"]-pastImportance+2)
-            amount = int(secBeforeCol) if available >= secBeforeCol else available
+            amount = int(rowsBeforeCol) if available >= rowsBeforeCol else available
             dataDict["COL"][-amount:] = [1]*amount
 
-    # for key, val in dataDict.items():
-    #     print(key, val, len(val))
-    return DataFrame(dataDict)
-
+    df = DataFrame(dataDict)
+    df = df[df["toRemove"] == 0] if removeCol else df
+    df.drop("toRemove", axis=1, inplace=True)
+    return df
 
 
 def splitTrainTest(data: DataFrame, splitRatio: float=0.8) -> tuple[DataFrame, DataFrame, DataFrame, DataFrame]:
@@ -78,7 +89,7 @@ def splitTrainTest(data: DataFrame, splitRatio: float=0.8) -> tuple[DataFrame, D
     # Removing all non numeric values, might need to make string values into numbers
     # temp = temp.drop(["Execution","ScenarioID","Configuration_API_Description"], axis=1)
     split = int(np.floor(len(data)*splitRatio))
-    print(f"splitting at {split}.")
+    print(f"Splitting at {split}, total rows: {len(data)}")
 
     trainX, testX = temp[:split], temp[split:]
 
@@ -105,9 +116,10 @@ class NewPredicter(Predicter):
         # print(f"amount of features: {self.numberOfFeatures}")
         
 
-    def preProcess(self, x: DataFrame) -> np.array:
+    def preProcess(self, x: DataFrame or list or np.array) -> np.array:
         """
         Process x and y by transforming to np.array and mean scale x.
+        # TODO: Clean this up
         
         Params:
             x: dataframe, Series, list or np.array
@@ -165,7 +177,6 @@ class NewPredicter(Predicter):
             ...
 
         """
-        # print("Nye predict")
         # if len(x) != self.numberOfFeatures:
         #     print(f"Wrong amount of features!, got {len(x)}, need to have {self.numberOfFeatures}")
         #     return None
@@ -216,8 +227,6 @@ class NewPredicter(Predicter):
         Params:
             name: str, name of file
         """
-        # path = os.path.dirname(os.path.realpath(__file__))
-        print("Nye loadModel")
         file = f"{PATH}/main/ML/models/{name}.pkl"
         p = cls()
         try:
@@ -231,7 +240,7 @@ class NewPredicter(Predicter):
 
 
 if __name__ == "__main__":
-    data = makeDataUsable(read_csv(PATH + "/data/testGenerateData.csv"), 4, 3)
+    data = makeDataUsable(read_csv(PATH + "/data/generatedData.csv"), 4, 4)
     data.drop(columns=data.columns[0], axis=1, inplace=True)
     # print(data.head(10))
     trainX, trainY, testX, testY = splitTrainTest(data)
@@ -239,20 +248,24 @@ if __name__ == "__main__":
     # print(trainX.head())
 
     # p = NewPredicter.loadModel("xgb_2_582-11-16-201")
+    p = NewPredicter.loadModel("MLPClassifierWithGeneratedData")
     # print(p.__dict__)
 
-    p = NewPredicter()
-    trainXpp = p.preProcess(trainX)
-    trainYpp = trainY.to_numpy()
-    testXpp = p.preProcess(testX)
-    testYpp = testY.to_numpy()
-    print(f"trainX: {type(trainXpp)}, trainY: {type(trainYpp)}, testX: {type(testXpp)}, testY: {type(testYpp)}")
+    # p = NewPredicter()
+    # trainXpp = p.preProcess(trainX)
+    # trainYpp = trainY.to_numpy()
+    # testXpp = p.preProcess(testX)
+    # testYpp = testY.to_numpy()
+    # print(f"trainX: {type(trainXpp)}, trainY: {type(trainYpp)}, testX: {type(testXpp)}, testY: {type(testYpp)}")
     # print(trainXpp)
-    p.fit(trainXpp, trainYpp)
+    # p.fit(trainXpp, trainYpp)
 
     pred = []
-    for i in range(len(testX)):
-        pred.append(p.predict(testX.iloc[i]))
+    print(p.numberOfFeatures)
+    # TODO må preprocesse før predict
+    for _, row in testX.iterrows():
+        r = p.preProcess(row)
+        pred.append(int(p.predict(r)))
     print(pred)
 
     p.getScore(pred, testY)

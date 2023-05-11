@@ -4,7 +4,7 @@ import open3d as o3d
 from accepts import accepts
 
 PATH = os.path.abspath(__file__)
-PATH = PATH[:PATH[:PATH.rfind("\\")].rfind("\\")]
+PATH = PATH[:PATH.find("main")-1]
 
 
 class ReadLidar():
@@ -100,7 +100,11 @@ class ReadLidar():
 
         TODO: See at other points as well that are not directly in front.
         """
-        self.closestPointInFront = (102.87,0,-1) # (102.87,0,-1)
+        def euclidian(x, y, z):
+            return np.sqrt(x**2 + y**2 + z**2)
+
+        self.closestPointInFront = (102.87, 0, 0) # (102.87,0,-1)
+        dto = 102.87
         # for x, y, z in self.inFront:
         #     # print(x, y, z)
         #     # if z > self.ground and z < self.vehicleHeight and np.sqrt(x**2+y**2) < np.sqrt(self.closestPointInFront[0]**2+self.closestPointInFront[1]**2):
@@ -109,6 +113,14 @@ class ReadLidar():
         # # return self.closestPointInFront
         # return round(np.sqrt((self.closestPointInFront[0] - 2.87)**2+self.closestPointInFront[1]**2), 4)
         # self.closestPointInFront = 102.87
+
+        for x, y, z in np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z > self.ground and z < self.vehicleHeight]):
+            newDistance = euclidian(x, y, z)
+            self.closestPointInFront = (x, y, z) if newDistance < dto else self.closestPointInFront
+            dto = newDistance if newDistance < dto else dto
+        
+        return round(dto-2.87, 4) if dto-2.87 > 0 else 0
+
         for x, y, z in np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z > self.ground and z < self.vehicleHeight]):
             self.closestPointInFront = (x, y, z) if x < self.closestPointInFront[0] else self.closestPointInFront
         return round(self.closestPointInFront[0] - 2.87, 4)

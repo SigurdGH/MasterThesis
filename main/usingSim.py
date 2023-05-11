@@ -11,11 +11,12 @@ from pandas import DataFrame
 import math
 
 PATH = os.path.abspath(__file__)
-PATH = PATH[:PATH[:PATH.rfind("\\")].rfind("\\")]
+PATH = PATH[:PATH.find("main")-1]
 sys.path.insert(0, PATH)
 
 from main.ML.Model import Predicter
 from main.readLidar import ReadLidar
+from main.generateTestingData.useGeneratedData import NewPredicter
 
 
 # TODO
@@ -57,26 +58,26 @@ def fromScenario(filename: str="", mode: int=0):
     runner.run(mode) # mode=0: disable ADSs; mode=1: enable ADSs
 
 
-def plotData(s, a, j, p, duration, interval, dto, ttc):
-    x = [i for i in range(len(s))]
+def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc):
+    x = [i for i in range(len(speeds))]
 
     # print(len(s), len(a), len(j), len(p), duration, interval, len(dto))
 
     plt.figure(figsize=(12, 5))
 
     plt.subplot(121)
-    plt.plot(x, s, "-", label="Speed (m/s)")
-    plt.plot(x, a, "--", label="Acceleration (m/s^2)")
-    plt.plot(x, j, ":", label="Jerk (m/s^3)")
-    plt.plot(x, [i*10 for i in p], "-r", label="Predicted collision (0 or 10)")
+    plt.plot(x, speeds, "-", label="Speed (m/s)")
+    plt.plot(x, accelerations, "--", label="Acceleration (m/s^2)")
+    plt.plot(x, jerks, ":", label="Jerk (m/s^3)")
+    plt.plot(x, [i*10 for i in predictions], "-r", label="Predicted collision (0 or 10)")
     plt.xlabel(f"Time, delta = {interval} s, duration = {duration} s")
     plt.legend()
     plt.grid()
     plt.title("Speed, acceleration, jerk and collision prediction")
 
     plt.subplot(122)
-    plt.plot(x, s, "-", label="Speed (m/s)")
-    plt.plot(x, [i*10 for i in p], "-r", label="Predicted collision (0 or 10)")
+    plt.plot(x, speeds, "-", label="Speed (m/s)")
+    plt.plot(x, [i*10 for i in predictions], "-r", label="Predicted collision (0 or 10)")
     plt.plot(x, dto, "--", label="DTO (m)")
     plt.plot(x, ttc, "-", label="TTC (s)")
     plt.xlabel(f"Time, delta = {interval} s, duration = {duration} s")
@@ -87,38 +88,38 @@ def plotData(s, a, j, p, duration, interval, dto, ttc):
     plt.show()
 
 
-class P():
-    def __init__(self, filename) -> None:
-        self.model = Predicter()
-        self.model.loadModel(filename)
-        self.translate = {1: "You are going to crash!", 0: "Not crashing!"}
+# class P():
+#     def __init__(self, filename) -> None:
+#         self.model = Predicter()
+#         self.model.loadModel(filename)
+#         self.translate = {1: "You are going to crash!", 0: "Not crashing!"}
 
-    def predict(self, ttc=20, dto=20, jerk=0, speeds=[0,0,0,0,0,0], angular=[]):
-        """
-        Used to predict: [TTC, DTO, Jerk, road, scenario, speed1, speed2, speed3, speed4, speed5, speed6]
+#     def predict(self, ttc=20, dto=20, jerk=0, speeds=[0,0,0,0,0,0], angular=[]):
+#         """
+#         Used to predict: [TTC, DTO, Jerk, road, scenario, speed1, speed2, speed3, speed4, speed5, speed6]
 
-        TODO
-        Make sure the values are correct.
-        Make it so prediction only takes from each second, if updateInterval is lower then 1.
+#         TODO
+#         Make sure the values are correct.
+#         Make it so prediction only takes from each second, if updateInterval is lower then 1.
 
-        Attribute[TTC]	Attribute[DTO]	Attribute[Jerk]	reward	road	strategy	scenario	speed1	speed2	speed3	speed4	speed5	speed6
-        100000.000000	6.434714	5.04	ttc	road2	random	rain_night	5.547	4.660	4.401	4.228	3.986	3.746
+#         Attribute[TTC]	Attribute[DTO]	Attribute[Jerk]	reward	road	strategy	scenario	speed1	speed2	speed3	speed4	speed5	speed6
+#         100000.000000	6.434714	5.04	ttc	road2	random	rain_night	5.547	4.660	4.401	4.228	3.986	3.746
         
-        ### Params
-            ...
+#         ### Params
+#             ...
 
-        """
-        # x = np.array([20, 20, 1, 2, 1,1,2,3,4,5,6])
-        if len(angular) < 6:
-            x = [ttc, dto, jerk] + speeds
-        else:
-            x = [dto, jerk] + speeds + np.array(angular).flatten().tolist()
-        # print(f"Inne i predict: {x}")
-        xP, _ = self.model.preProcess(x)
-        # print(f"x: {x}\t\tprocessed: {xP[0]}")
-        prediction = self.model.predict(xP)[0]
-        # return self.translate[prediction]
-        return prediction
+#         """
+#         # x = np.array([20, 20, 1, 2, 1,1,2,3,4,5,6])
+#         if len(angular) < 6:
+#             x = [ttc, dto, jerk] + speeds
+#         else:
+#             x = [dto, jerk] + speeds + np.array(angular).flatten().tolist()
+#         # print(f"Inne i predict: {x}")
+#         xP, _ = self.model.preProcess(x)
+#         # print(f"x: {x}\t\tprocessed: {xP[0]}")
+#         prediction = self.model.predict(xP)[0]
+#         # return self.translate[prediction]
+#         return prediction
         
 
 
@@ -493,13 +494,13 @@ class Simulation():
         if distance >= 100:
             return NO_COLLISION
         if preDistance - distance > 3 * speed:
-            print("\tNEW OBJECT")
+            # print("\tNEW OBJECT")
             return NO_COLLISION
 
         speedObject = Simulation.getSpeedOfObject(preDistance, distance, speed, preSpeed, interval)
         relativeSpeed = speed - speedObject
         relativeAcceleration = 0 # accA - accB # Maybe not necessary with acceleration of B
-        print(f"\nEGO: {round(speed, 2)}, object: {round(speedObject, 2)}, speed diff: {round(relativeSpeed, 2)}, dto: {distance}")
+        # print(f"\nEGO: {round(speed, 2)}, object: {round(speedObject, 2)}, speed diff: {round(relativeSpeed, 2)}, dto: {distance}")
         
         if relativeAcceleration == 0:
             if speed <= speedObject:
@@ -507,26 +508,27 @@ class Simulation():
             ttc = distance / relativeSpeed
             return ttc if ttc <= 50 else 50
         
-        num = relativeSpeed**2 - 4 * 0.5 * relativeAcceleration * (-distance)
-        # print(f"(-{relativeSpeed} +- sqrt({relativeSpeed}^2 - 4*0.5*{relativeAcceleration}*(-{distance}))) / 2 * 0.5 {relativeAcceleration}")
-        if num >= 0:
-            t_add = (-relativeSpeed + math.sqrt(num)) / (2*0.5*relativeAcceleration)
-            t_sub = (-relativeSpeed - math.sqrt(num)) / (2*0.5*relativeAcceleration)
-            if t_add > 0 and t_add < 50:
-                return t_add
-            elif t_sub > 0 and t_sub < 50:
-                return t_sub
-        return NO_COLLISION # Not going to collide
+        # num = relativeSpeed**2 - 4 * 0.5 * relativeAcceleration * (-distance)
+        # # print(f"(-{relativeSpeed} +- sqrt({relativeSpeed}^2 - 4*0.5*{relativeAcceleration}*(-{distance}))) / 2 * 0.5 {relativeAcceleration}")
+        # if num >= 0:
+        #     t_add = (-relativeSpeed + math.sqrt(num)) / (2*0.5*relativeAcceleration)
+        #     t_sub = (-relativeSpeed - math.sqrt(num)) / (2*0.5*relativeAcceleration)
+        #     if t_add > 0 and t_add < 50:
+        #         return t_add
+        #     elif t_sub > 0 and t_sub < 50:
+        #         return t_sub
+        # return NO_COLLISION # Not going to collide
 
 
     def runSimulation(self, 
                       simDuration: float=10, 
-                      updateInterval: float=1, 
-                      window: float=0.5, model: 
-                      str="Classifier", 
+                      updateInterval: float=0.5, 
+                      window: float=0.5, 
+                      model: str="Classifier", 
                       runScenario: int=0, 
                       plotting: bool=True, 
-                      storePredictions: bool = False):
+                      storePredictions: bool = False,
+                      useGeneratedData: bool=True):
         """
         Run a simulation in LGSVL (OSSDC-SIM).
 
@@ -539,6 +541,7 @@ class Simulation():
             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
         """        
         ### Variables
+        pastImportance = 4
         ttcList = [50] # seconds
         dtoList = [100] # meters
         speeds = [0] # m/s
@@ -546,8 +549,12 @@ class Simulation():
         jerk = [0] # m/s^3
         predictions = [0] * int(5 // updateInterval) # bool, 0 or 1
         angular = [[0,0,0]]  # m/s, m/s, m/s
+        angularX = [0] # m/s
+        angularY = [0] # m/s
+        angularZ = [0] # m/s
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
+        printingInfo = [("TTC: ", " s"), ("DTO: ", " m"), ("JERK: ", " m/s^3"), ("Speed: ", " m/s"), ("Time: ", " s")]
         
         # df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
         paramsToStore = []
@@ -559,17 +566,23 @@ class Simulation():
             print(f"starting simulation with scenario {runScenario}...")
             self.useScenario(runScenario)
             # self.controls.throttle = 0.2
-            # self.spawnNPCVehicle("Sedan", 30, 0.5, 0, True)
+            # self.spawnNPCVehicle("Sedan", 30, 0.5, 10, True)
         else:
             print("Driving with keyboard!")
             self.spawnNPCVehicle("Sedan", 10, 0, 0, 10, True)
         
         ### Classes
-        pred = P(model)
+        # pred = P(model) # Import predictor and load model with new predicts?
+        if useGeneratedData:
+            predicter = NewPredicter.loadModel(model)
+            predictions = [0] * 4
+        else:
+            predicter = Predicter() 
+            predicter.loadModel(model)
         lidar = ReadLidar(window, 35)
 
-        intsPerSec = int(1//updateInterval)
-        print(f"Updating {intsPerSec} times per second!")
+        intsPerHalfSec = int(0.5//updateInterval) # NOTE this might not work as intended with updateInterval != 0.5
+        print(f"Updating {intsPerHalfSec*2} times per second!")
 
         oldControls = copy(self.controls.__dict__)
         self.controls.headlights = 0
@@ -581,29 +594,27 @@ class Simulation():
             dtoList.append(lidar.updatedDTO)
             # Maybe use this to check distances in comparison with the lidar
             # self.getDTOs()
-            speed = self.ego.state.speed
-            speeds.append(round(speed, 3))
+            speeds.append(round(self.ego.state.speed, 3))
             acceleration.append((speeds[-1]-speeds[-2])/updateInterval)
             jerk.append(round(abs((acceleration[-1]-acceleration[-2])/updateInterval), 3)) # NOTE looks like jerk is always positive in the dataset
 
             ### Angular
             angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
-            
-            ### Cruise controll
-            # targetSpeed = 5
-            # if speed-targetSpeed > 0.5: # Drives too fast
-            #     self.controls.throttle -= 0.2 if self.controls.throttle >= 0.2 else 0
-            # elif speed-targetSpeed < 0.5: # Drives too slow
-            #     self.controls.throttle += 0.2 if self.controls.throttle <= 0.8 else 0
-            # else:
-            #     self.controls.throttle = 0
+            angularX.append(round(self.ego.state.angular_velocity.x, 3))
+            angularY.append(round(self.ego.state.angular_velocity.y, 3))
+            angularZ.append(round(self.ego.state.angular_velocity.z, 3))
 
             ### Old TTC
             # ttcList.append(round(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval), 3))
             ttcList.append(self.calculateTTC(dtoList[-2], dtoList[-1], speeds[-1], speeds[-2], acceleration[-1], updateInterval))
 
             ## Some nice information
-            print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
+            stuff = [round(ttcList[-1], 2), round(dtoList[-1], 2), round(np.average(jerk[-(6):]), 2), round(speeds[-1], 3), round(self.sim.current_time, 1)]
+            for info, value in zip(printingInfo, stuff):
+                print(f"{info[0]}{value}{info[1]}".ljust(22), end="")
+            else:
+                print()
+            # print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
 
             ### Evasive action
             # if dtoList[-1] < 15:
@@ -616,26 +627,33 @@ class Simulation():
             #     self.controls.steering = 0
 
             ### Starts the collision prediction
-            if len(speeds) > 5 // updateInterval:
-                # predictions.append(pred.predict(ttc=ttcList[-1], dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerSec)::intsPerSec]))
-                predictions.append(pred.predict(dto=dtoList[-1], jerk=round(np.average(jerk[-(6*intsPerSec)::intsPerSec]), 3), speeds=speeds[-(6*intsPerSec)::intsPerSec], angular=angular[-(6*intsPerSec)::intsPerSec]))
+            if (timeRan//updateInterval >= pastImportance) or (len(speeds) > 5 // updateInterval):
+            # if len(speeds) > 2 // updateInterval:
+                # predictions.append(pred.predict(ttc=ttcList[-1], dto=dtoList[-1], jerk=np.average(jerk[-(6):]), speeds=speeds[-(6*intsPerHalfSec)::intsPerHalfSec]))
+                if useGeneratedData:
+                    row = ttcList[-pastImportance:] + dtoList[-pastImportance:] \
+                        + jerk[-pastImportance:] + speeds[-pastImportance:] \
+                            + angularX[-pastImportance:] + angularY[-pastImportance:] \
+                                + angularZ[-pastImportance:]
+                    # print(row)
+                    predictions.append(predicter.predict(predicter.preProcess(row)))
+                else:
+                    predictions.append(predicter.predict(dto=dtoList[-1], 
+                                                    jerk=round(np.average(jerk[-(6*intsPerHalfSec)::intsPerHalfSec]), 3), 
+                                                    speeds=speeds[-(6*intsPerHalfSec)::intsPerHalfSec], 
+                                                    angular=angular[-(6*intsPerHalfSec)::intsPerHalfSec]))
 
                 if storePredictions:
                     # TODO Make it so the last x before an actual collision also is 1?
                     actualCollision = 1 if self.actualCollisionTimeStamp > timeRan-updateInterval else 0
                     if len(paramsToStore) > 0: paramsToStore[-1][-1] = actualCollision
-                    paramsToStore.append([ttcList[-1], dtoList[-1], round(np.average(jerk[-(6*intsPerSec)::intsPerSec]), 3)] + [i for i in speeds[-(6*intsPerSec)::intsPerSec]] + [i for xyz in angular[-(6*intsPerSec)::intsPerSec] for i in xyz] + [predictions[-1], None])
+                    paramsToStore.append([ttcList[-1], dtoList[-1], round(np.average(jerk[-(6*intsPerHalfSec)::intsPerHalfSec]), 3)] + [i for i in speeds[-(6*intsPerHalfSec)::intsPerHalfSec]] + [i for xyz in angular[-(6*intsPerHalfSec)::intsPerHalfSec] for i in xyz] + [predictions[-1], None])
 
 
             ### Check if a collision has been predicted
             if predictions[-1] and predictions[-1] != predictions[-2]:
                 print("A COLLISION IS GOING TO HAPPEN!")
                 lastCollision = timeRan
-            #     self.controls.braking = 1
-            #     self.ego.apply_control(self.controls, True)
-            # else:
-            #     self.controls.braking = 0
-            #     self.ego.apply_control(self.controls, False)
 
             ### Turns on hazards and applies the brakes
             self.isColliding(lastCollision, timeRan)
@@ -653,6 +671,15 @@ class Simulation():
             self.writeParameters(paramsToStore, True)
 
         if plotting:
+            print(len(speeds))
+            print(len(acceleration))
+            print(len(jerk))
+            print(len(predictions))
+            # print(len(simDuration))
+            # print(len(updateInterval))
+            print(len(dtoList))
+            print(len(ttcList))
+
             plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList)
 
 
@@ -660,10 +687,14 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=50,
+    sim.runSimulation(simDuration=15,
                       updateInterval=0.5,
                       window=1.0,
-                      model="xgb_2_582-11-16-201",
+                      model = "MLPClassifierWithGeneratedData",
+                    #   model = "xgb_gen_438-6-20-10",
+                    #   model="xgb_2_582-11-16-201", # NOTE må bruke ny modell
                       runScenario=0,
-                      plotting=False,
-                      storePredictions=False)
+                      plotting=True,
+                      storePredictions=False,
+                      useGeneratedData=True)
+    
