@@ -413,7 +413,7 @@ class Simulation():
             * distanceEgo = interval * (speed + preSpeed)/2
             * distanceObject = distanceEgo + distance - distance0
             * speedObject = distanceObject / interval
-            * -> v_object = ((t * (v_ego_1 + v_ego_1)/2) + d_1 - d_0) / t
+            * -> v_object = ((t * (v_ego_1 + v_ego_0)/2) + d_1 - d_0) / t
         ### Params:
             * distance0: float, distance (m) to the object one "interval" ago
             * distance: float, distance (m) to the object one "interval" ago
@@ -432,23 +432,42 @@ class Simulation():
 
 
     @staticmethod
-    def calculateTTC(preDistance: float, distance: float, preSpeed: float, speed: float, accA: float, interval: float) -> float:
+    def calculateTTC(distance_0: float, distance_1: float, interval: float, speed: float) -> float:
         """
-        Calculate time to collision when both objects can be on the move.
-
-        ### Formulas
-        d = vt + 0.5at^2\\
-        0.5at^2 + vt + (-d) = 0
-        --> t = (-v +- sqrt(v^2 - 4*0.5*a*d)) / (2 * 0.5 a)
+        Calculate time to collision when both objects can be on the move.\\
+        It will return NO_COLLISION if the distance_1 is greater than distance_0, 
+        i.e., the obstacles is moving away from the EGO vehicle. It will also return
+        NO_COLLISION if the difference between the distances are greter than 3 times
+        the currents speed, i. e. the most likely reason this can occur is if the 
+        DTO was registering something very far away (or nothing at all) and now is
+        registering a closer obstacle.
+        
+        ### Current formula
+            * t = d_1 / ((d_1 - d_0) / t)
+        
+        ### Params:
+            * distance_0: float, distance (m) to the object one "interval" ago
+            * distance_1: float, current distance (m) to the object
+            * interval: float, time (s) interval between each update
+            * speed: float, current speed (m/s) of the EGO vehicle
+        
+        ### Olf formulas
+            * d = vt + 0.5at^2
+            * 0.5at^2 + vt + (-d) = 0
+            * --> t = (-v +- sqrt(v^2 - 4*0.5*a*d)) / (2 * 0.5 a)
+        Not using acceleration:
+            * --> t = d / (v_ego - v_object)
+        Old input:
+            * preDistance: float, distance: float, preSpeed: float, speed: float, accA: float, interval: float
 
         ### NOTE
-        Maybe not necessary to use acceleration / it is more precise to not use it
+        Maybe not necessary to use acceleration, as it is more precise to not use it.
 
         ### NOTE
         If the distance is high enough and the acceleration is negative enough, 
         the NPC vehicle is "calculated" to have negative speed because the acceleration is constant
 
-        ### Params:
+        ### Old params:
             * preDistance: float, distance (m) to the object one "interval" ago
             * distance: float, current distance (m) to the object
             * preSpeedA: float, speed (m/s) of the EGO vehicle one "interval" ago
@@ -460,24 +479,28 @@ class Simulation():
             * ttc: float, time (s) to collision
         """
         NO_COLLISION = 50
+        return distance_1 / ((distance_0-distance_1) / interval) if \
+            distance_0 > distance_1 and distance_0 - distance_1 < speed * 3 else NO_COLLISION
 
-        if distance >= 100:
-            return NO_COLLISION
-        if preDistance - distance > 3 * speed:
-            # print("\tNEW OBJECT")
-            return NO_COLLISION
+        ### Previous version
+        # if distance >= 100:
+        #     return NO_COLLISION
+        # if preDistance - distance > 3 * speed:
+        #     # print("\tNEW OBJECT")
+        #     return NO_COLLISION
 
-        speedObject = Simulation.getSpeedOfObject(preDistance, distance, speed, preSpeed, interval)
-        relativeSpeed = speed - speedObject
-        relativeAcceleration = 0 # accA - accB # Maybe not necessary with acceleration of B
-        # print(f"\nEGO: {round(speed, 2)}, object: {round(speedObject, 2)}, speed diff: {round(relativeSpeed, 2)}, dto: {distance}")
+        # speedObject = Simulation.getSpeedOfObject(preDistance, distance, speed, preSpeed, interval)
+        # relativeSpeed = speed - speedObject
+        # relativeAcceleration = 0 # accA - accB # Maybe not necessary with acceleration of B
+        # # print(f"\nEGO: {round(speed, 2)}, object: {round(speedObject, 2)}, speed diff: {round(relativeSpeed, 2)}, dto: {distance}")
         
-        if relativeAcceleration == 0:
-            if speed <= speedObject:
-                return NO_COLLISION
-            ttc = distance / relativeSpeed
-            return ttc if ttc <= 50 else 50
+        # if relativeAcceleration == 0:
+        #     if speed <= speedObject:
+        #         return NO_COLLISION
+        #     ttc = distance / relativeSpeed
+        #     return ttc if ttc <= 50 else 50
         
+        ### was not used
         # num = relativeSpeed**2 - 4 * 0.5 * relativeAcceleration * (-distance)
         # # print(f"(-{relativeSpeed} +- sqrt({relativeSpeed}^2 - 4*0.5*{relativeAcceleration}*(-{distance}))) / 2 * 0.5 {relativeAcceleration}")
         # if num >= 0:
@@ -525,7 +548,7 @@ class Simulation():
         angularZ = [0] # m/s
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
-        printingInfo = [("TTC: ", " s"), ("DTO: ", " m"), ("JERK: ", " m/s^3"), ("Speed: ", " m/s"), ("Time: ", " s")]
+        printingInfo = [("Time: ", " s"), ("TTC: ", " s"), ("DTO: ", " m"), ("JERK: ", " m/s^3"), ("Speed: ", " m/s")]
         
         # df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
         paramsToStore = []
@@ -575,12 +598,20 @@ class Simulation():
             angularY.append(round(self.ego.state.angular_velocity.y, 3))
             angularZ.append(round(self.ego.state.angular_velocity.z, 3))
 
-            ### Old TTC
+            ### Oldest TTC
             # ttcList.append(round(self.getTTC(speed, dtoList[-2], dtoList[-1], updateInterval), 3))
-            ttcList.append(self.calculateTTC(dtoList[-2], dtoList[-1], speeds[-1], speeds[-2], acceleration[-1], updateInterval))
+            ### Old TTC
+            # ttcList.append(self.calculateTTC(dtoList[-2], dtoList[-1], speeds[-1], speeds[-2], acceleration[-1], updateInterval))
+            ttcList.append(self.calculateTTC(dtoList[-2], dtoList[-1], updateInterval, speeds[-1]))
 
             ## Some nice information
-            stuff = [round(ttcList[-1], 2), round(dtoList[-1], 2), round(np.average(jerk[-(6):]), 2), round(speeds[-1], 3), round(self.sim.current_time, 1)]
+            stuff = [round(self.sim.current_time, 1), round(ttcList[-1], 2), round(dtoList[-1], 2), round(np.average(jerk[-(6):]), 2), round(speeds[-1], 3)]
+            # # otherTTC = dtoList[-1] / ((dtoList[-2]-dtoList[-1]) / updateInterval) if dtoList[-2] > dtoList[-1] and dtoList[-2] - dtoList[-1] < speeds[-1] * 4 else 50
+            # # if len(dtoList) > 3:
+            # #     print(str(dtoList[-4:]).ljust(50), end="")
+            # # else:
+            # #     print(str(dtoList).ljust(50), end="")
+            # print(f"Other TTC: {round(otherTTC, 2)}".ljust(22), end="")
             for info, value in zip(printingInfo, stuff):
                 print(f"{info[0]}{value}{info[1]}".ljust(22), end="")
             else:
@@ -635,8 +666,8 @@ class Simulation():
                 lastCollision = timeRan
 
             ### Turns on hazards and applies the brakes
-            # self.isColliding(lastCollision, timeRan, (runScenario == 0 and brakeOnCol))
-            self.controls.braking = 1 if predictions[-1] or predictions[-2] or predictions[-3] else 0
+            self.isColliding(lastCollision, timeRan, (runScenario == 0 and brakeOnCol))
+            # self.controls.braking = 1 if predictions[-1] or predictions[-2] or predictions[-3] else 0
 
             ### Only applies new controls if something has changed
             if self.controls.__dict__ != oldControls and bool(runScenario):
@@ -658,7 +689,7 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=15,
+    sim.runSimulation(simDuration=30,
                       updateInterval=0.5,
                       window=1.0,
                     #   model = "MLPClassifierWithGeneratedData",
@@ -666,9 +697,9 @@ if __name__ == "__main__":
                     #   model = "xgb_gen_55-16-20-59",
                       model = "xgb_gen_80-15-37-65",
                     #   model="xgb_2_582-11-16-201", # NOTE må bruke ny modell
-                      runScenario=1,
+                      runScenario=0,
                       plotting=True,
                       storePredictions=False,
                       useGeneratedData=True,
-                      brakeOnCol=True)
+                      brakeOnCol=False)
     
