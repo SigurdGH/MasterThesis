@@ -443,7 +443,7 @@ class Simulation():
         registering a closer obstacle.
         
         ### Current formula
-            * t = d_1 / ((d_1 - d_0) / t)
+            * t_ttc = d_1 / ((d_0 - d_1) / t)
         
         ### Params:
             * distance_0: float, distance (m) to the object one "interval" ago
@@ -454,9 +454,9 @@ class Simulation():
         ### Olf formulas
             * d = vt + 0.5at^2
             * 0.5at^2 + vt + (-d) = 0
-            * --> t = (-v +- sqrt(v^2 - 4*0.5*a*d)) / (2 * 0.5 a)
+            * --> t_ttc = (-v +- sqrt(v^2 - 4*0.5*a*d)) / (2 * 0.5 a)
         Not using acceleration:
-            * --> t = d / (v_ego - v_object)
+            * --> t_ttc = d / (v_ego - v_object)
         Old input:
             * preDistance: float, distance: float, preSpeed: float, speed: float, accA: float, interval: float
 
@@ -593,7 +593,7 @@ class Simulation():
             jerk.append(round(abs((acceleration[-1]-acceleration[-2])/updateInterval), 3)) # NOTE looks like jerk is always positive in the dataset
 
             ### Angular
-            angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
+            # angular.append([round(self.ego.state.angular_velocity.x, 3), round(self.ego.state.angular_velocity.y, 3), round(self.ego.state.angular_velocity.z, 3)])
             angularX.append(round(self.ego.state.angular_velocity.x, 3))
             angularY.append(round(self.ego.state.angular_velocity.y, 3))
             angularZ.append(round(self.ego.state.angular_velocity.z, 3))
