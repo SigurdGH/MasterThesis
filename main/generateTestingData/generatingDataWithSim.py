@@ -122,7 +122,7 @@ class GenerateData(Simulation):
 
 
 if __name__ == "__main__":
-    sim = GenerateData("bg")
+    sim = GenerateData("sf")
     sim.spawnRandomNPCs(amountVehicles=20, amountPedestrians=10)
     sim.generateDataWithSim(simDuration=900, updateInterval=0.5, window=1.0, filename="generatedData", storeData=False)
 
