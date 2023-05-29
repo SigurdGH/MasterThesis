@@ -101,11 +101,9 @@ class GenerateData(Simulation):
             paramsToStore["asY"].append(round(self.ego.state.angular_velocity.y, 3))
             paramsToStore["asZ"].append(round(self.ego.state.angular_velocity.z, 3))
             paramsToStore["TTC"].append(round(self.calculateTTC(paramsToStore["DTO"][-2], 
-                                                                paramsToStore["DTO"][-1], 
-                                                                paramsToStore["Speed"][-1], 
-                                                                paramsToStore["Speed"][-2], 
-                                                                acceleration[-1], 
-                                                                updateInterval), 3))
+                                                                paramsToStore["DTO"][-1],
+                                                                updateInterval,
+                                                                paramsToStore["Speed"][-1]), 3))
             paramsToStore["COL"].append(1 if self.actualCollisionTimeStamp > timeRan-1 else 0)
 
             ### Some nice information to the console
@@ -124,7 +122,7 @@ class GenerateData(Simulation):
 
 
 if __name__ == "__main__":
-    sim = GenerateData("sf")
+    sim = GenerateData("bg")
     sim.spawnRandomNPCs(amountVehicles=20, amountPedestrians=10)
     sim.generateDataWithSim(simDuration=900, updateInterval=0.5, window=1.0, filename="generatedData", storeData=False)
 
