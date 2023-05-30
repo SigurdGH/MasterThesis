@@ -695,9 +695,10 @@ if __name__ == "__main__":
                     #   model = "MLPClassifierWithGeneratedData",
                     #   model = "xgb_gen_30-9-11-27",
                     #   model = "xgb_gen_55-16-20-59",
-                      model = "xgb_gen_80-15-37-65",
+                    #   model = "xgb_gen_80-15-37-65",
+                      model = "XGBClassifier_gen_27-11-10-43",
                     #   model="xgb_2_582-11-16-201", # NOTE må bruke ny modell
-                      runScenario=0,
+                      runScenario=1,
                       plotting=True,
                       storePredictions=False,
                       useGeneratedData=True,
