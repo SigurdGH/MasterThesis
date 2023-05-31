@@ -62,6 +62,22 @@ def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto,
     x = [i for i in range(len(speeds))]
 
     # print(len(s), len(a), len(j), len(p), duration, interval, len(dto))
+    NAME = "test"
+    
+    info = {
+        "speed": speeds,
+        "accelerations" : accelerations,
+        "jerks": jerks, 
+        "predictions": predictions, 
+        "duration": duration, 
+        "interval": interval, 
+        "dto": dto, 
+        "ttc": ttc,
+        "time": x
+        }
+    
+    df = DataFrame(info)
+    df.to_csv(PATH + "/data/fromUsingSim/" + NAME + ".csv")
 
     plt.figure(figsize=(12, 5))
 
