@@ -58,12 +58,10 @@ def fromScenario(filename: str="", mode: int=0):
     runner.run(mode) # mode=0: disable ADSs; mode=1: enable ADSs
 
 
-def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc):
+def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc, modelName):
     x = [i for i in range(len(speeds))]
 
     # print(len(s), len(a), len(j), len(p), duration, interval, len(dto))
-    NAME = "test"
-    
     info = {
         "speed": speeds,
         "accelerations" : accelerations,
@@ -77,7 +75,7 @@ def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto,
         }
     
     df = DataFrame(info)
-    df.to_csv(PATH + "/data/fromUsingSim/" + NAME + ".csv")
+    df.to_csv(PATH + "/data/fromUsingSim/" + modelName + ".csv")
 
     plt.figure(figsize=(12, 5))
 
@@ -698,7 +696,7 @@ class Simulation():
             self.writeParameters(paramsToStore, True)
 
         if plotting:
-            plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList)
+            plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList, model)
 
 
 if __name__ == "__main__":
