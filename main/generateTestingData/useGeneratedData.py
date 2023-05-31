@@ -18,7 +18,7 @@ from main.ML.Model import Predicter
 from main.readLidar import ReadLidar
 
 
-def makeDataUsable(df: DataFrame, pastImportance: int=6, rowsBeforeCol: int=3, removeCol: bool=True) -> DataFrame:
+def makeDataUsable(df: DataFrame, pastImportance: int=4, rowsBeforeCol: int=5, removeCol: bool=True) -> DataFrame:
     """
     Make a usable Dataframe from a csv file from generated data.\\
     Creates pastImportance of columns for each prediction feature.\\
@@ -26,7 +26,7 @@ def makeDataUsable(df: DataFrame, pastImportance: int=6, rowsBeforeCol: int=3, r
     If undersampleRatio is > 0, it will under sample the data, if it is 0, it will not.
     
     ### Params:
-        * df: Dataframe, need to have the columns named "TTC", "DTO", "JERK" and "Speed"ArithmeticError
+        * df: Dataframe, need to have the columns named "TTC", "DTO", "JERK" and "Speed"
         * pastImportance: int, needs to be > 0
         * rowsBeforeCol: int, needs to be > 0
         * removeCol: bool, True if the origianl collision row should be removed
