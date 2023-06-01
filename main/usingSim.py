@@ -60,7 +60,7 @@ def fromScenario(filename: str="", mode: int=0):
 
 def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc, collisions, modelName):
     x = [i for i in range(len(speeds))]
-    
+
     # print(len(s), len(a), len(j), len(p), duration, interval, len(dto))
     info = {
         "speed": speeds,
@@ -297,7 +297,7 @@ class Simulation():
                     # self.otherAgents[0].change_lane(False)
             
         if scene == 1: # Car driving in front
-            self.spawnNPCVehicle("Sedan", 20, 0.5, 0, 8, True)
+            self.spawnNPCVehicle("Sedan", 10, 0.5, 0, 8, True)
             self.controls.throttle = 0.5
         elif scene == 2: # Left lane, overtake, change to right lane, continue
             self.spawnNPCVehicle("Sedan", -5, -4, 0, 8, True)
@@ -711,19 +711,21 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=10,
+    sim.runSimulation(simDuration=20,
                       updateInterval=0.5,
                       window=1.0,
-                    #   model = "MLPClassifierWithGeneratedData",
-                    #   model = "xgb_gen_30-9-11-27",
-                    #   model = "xgb_gen_55-16-20-59",
-                    #   model = "xgb_gen_80-15-37-65",
+                    #   model = "MLPClassifier_deep_577-16-29-188",
+                    #   model = "RandomForestClassifier_deep_583-10-28-189",
+                    #   model = "SVC_deep_582-11-70-147",
+                    #   model = "XGBClassifier_deep_582-11-16-201",
+                    #   model = "XGBClassifier_gen_PI4_RBC5_74-23-32-70",
+                    #   model = "RandomForestClassifier_gen_PI4_RBC5_76-37-21-65",
+                    #   model = "SVC_gen_PI4_RBC5_75-35-22-67",
                     #   model = "MLPClassifier_gen_PI4_RBC5_63-36-34-66",
-                      model = "MLPClassifier_deep_577-16-29-188",
-                    #   model="xgb_2_582-11-16-201", # NOTE må bruke ny modell
-                      runScenario=0,
+                      model = "RandomForestClassifier_gen_29-12-9-41",
+                      runScenario=1,
                       plotting=True,
                       storePredictions=False,
-                      useGeneratedData=False,
+                      useGeneratedData=True,
                       brakeOnCol=False)
     
