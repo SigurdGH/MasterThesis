@@ -8,6 +8,20 @@ Code for master thesis
 Running with different models:
 
 - DeepScenario based models:
+    - MLP: MLPClassifier_deep_577-16-29-188 =>
+        - predicted collision just abit to late and it crashed.
+
+    - Random Forest: RandomForestClassifier_deep_583-10-28-189 =>
+        - This model never crashed but was overly cautious and braked down too early. (50 + meters before collision)
+        - Stored image in raport folder.
+    
+    - SVM: SVC_deep_582-11-70-147 =>
+        - This one was very very good, breaked down in the right moment and never crashed.
+        - Stored image in raport folder.
+    - XGBoost: XGBClassifier_deep_582-11-16-201 =>
+        - This predicted the first collision to late and crashed.
+        - Stored image in raport folder.
+
 - Self Generated data based models:
     - MLP:
         - Model: MLPClassifier_gen_24-14-14-39 => 

@@ -75,7 +75,7 @@ def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto,
         }
     
     df = DataFrame(info)
-    df.to_csv(PATH + "/data/fromUsingSim/" + modelName + ".csv")
+    df.to_csv(PATH + "/data/fromUsingSim/" + modelName + ".csv", index=False)
 
     plt.figure(figsize=(12, 5))
 
@@ -703,14 +703,14 @@ if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=30,
+    sim.runSimulation(simDuration=20,
                       updateInterval=0.5,
                       window=1.0,
                     #   model = "MLPClassifierWithGeneratedData",
                     #   model = "xgb_gen_30-9-11-27",
                     #   model = "xgb_gen_55-16-20-59",
                     #   model = "xgb_gen_80-15-37-65",
-                      model = "XGBClassifier_gen_27-11-10-43",
+                      model = "MLPClassifier_gen_PI4_RBC5_63-36-34-66",
                     #   model="xgb_2_582-11-16-201", # NOTE må bruke ny modell
                       runScenario=1,
                       plotting=True,
