@@ -70,13 +70,14 @@ class GeneticAlgorithm():
     #     return 999999 if f == 0 else 1/f
 
     def fitness(self, features):
-        # f = math.log(((dto[-1]/ttc[-1])+speed[-1])/17)
         ttc = features[0:4]
         dto = features[4:8]
         speed = features[12:16]
         sum = 0
         for i, w in enumerate([0.1, 0.15, 0.25, 0.5]):
-            sum += abs((dto[i]/speed[i]) - ttc[i]) * w
+            sum += abs(ttc[i] * speed[i] - dto[i] + ttc[i]**2/dto[i] - speed[i]/2) * w
+            # sum += abs(ttc[i] * speed[i] - dto[i] + speed[i]**2/(dto[i]+1)**2 - (ttc[i]+1)**2) * w
+            # sum += abs((dto[i]/speed[i]) - ttc[i]) * w
             # sum += math.log((dto[i]/ttc[i])+speed[i] + 1)
         # f = sum/4
         return 999999 if sum == 0 else 1/sum
@@ -125,7 +126,8 @@ class GeneticAlgorithm():
             newGen = [individual[1] for individual in rankedPopulation[:self.toKeep]] # Keep n best from previous generation
             for _ in range((self.populationLimit - self.toKeep)//2):
                 # parent1, parent2 = random.sample(rankedPopulation[:100], 2)
-                parent1, parent2 = self._selection()
+                parent1, parent2 = self._selection(rankedPopulation)
+                
                 children = self._crossover(rankedPopulation[parent1][1], rankedPopulation[parent2][1])
                 for child in children:
                     if random.random() < self.mutationChance:
@@ -140,12 +142,21 @@ class GeneticAlgorithm():
             return rankedPopulation
 
     
-    def _selection(self):
+    def _selection(self, rankedPopulation):
         def chooseParent():
             return min([random.randint(0, self.populationLimit-1) for _ in range(self.selectionRate)])
-        parent1 = chooseParent()
-        parent2 = chooseParent()
-        return (parent1, parent2) if parent1 != parent2 else self._selection()
+        def diversity(parent1, parent2):
+            nZeros = 0
+            for g1, g2 in zip(parent1, parent2):
+                if abs(g1-g2) < 0.01:
+                    nZeros += 1
+            return nZeros
+        p1rank = chooseParent()
+        p2rank = chooseParent()
+        # s = diversity(rankedPopulation[p1rank], rankedPopulation[p1rank])
+        # print(rankedPopulation[p1rank][1])
+        return (p1rank, p2rank) if diversity(rankedPopulation[p1rank][1], rankedPopulation[p2rank][1]) < 1 else self._selection(rankedPopulation)
+        # return (p1rank, p2rank) if p1rank != p2rank else self._selection()
 
 
     def _crossover(self, parent1, parent2):
@@ -191,30 +202,31 @@ class GeneticAlgorithm():
 
     
 if __name__ == "__main__":
-    pass
-    # ga = GeneticAlgorithm(populationLimit=1000,
-    #                       maxGenerations=1000,
-    #                     #   maxValue=30,
-    #                     #   minValue=0,
-    #                     #   numberOfVariables=28,
-    #                       sd=0.2,
-    #                       mutationChance=0.4,
-    #                       toKeep=4)
-    # bestSolutions = ga.run()
-    # print(ga.population[:10])
+    # pass
+    ga = GeneticAlgorithm(populationLimit=1000,
+                          maxGenerations=1000,
+                        #   maxValue=30,
+                        #   minValue=0,
+                        #   numberOfVariables=28,
+                          sd=0.2,
+                          mutationChance=0.4,
+                          fitnessGoal=100,
+                          toKeep=4)
+    bestSolutions = ga.run()
+    print(ga.population[:10])
 
-    # # print(bestSolution)
+    # print(bestSolution)
 
-    # numberOfEach = 4
-    # colsToUse = ["TTCs", "DTOs", "JERKs", "Speeds"] #, "asX", "asY", "asZ"]
-    # print("\n")
-    # for values in bestSolutions[:10]:
-    #     print(f"Score: {round(values[0], 3)}".ljust(17), end=" ")
-    #     for i in range(0, 16, 4):
-    #         if (i) % 4 == 0:
-    #             s = colsToUse[(i) // 4]
-    #         vals = [round(v, 3) for v in values[1][i:i+numberOfEach]]
-    #         print(f"{s}: {vals}".ljust(40), end=" ")
-    #     print(f"\n\t\t  Angular: {[round(v, 3) for v in values[1][16:]]}", end="")
-    #     print()
+    numberOfEach = 4
+    colsToUse = ["TTCs", "DTOs", "JERKs", "Speeds"] #, "asX", "asY", "asZ"]
+    print("\n")
+    for values in bestSolutions[:10]:
+        print(f"Score: {round(values[0], 3)}".ljust(17), end=" ")
+        for i in range(0, 16, 4):
+            if (i) % 4 == 0:
+                s = colsToUse[(i) // 4]
+            vals = [round(v, 3) for v in values[1][i:i+numberOfEach]]
+            print(f"{s}: {vals}".ljust(40), end=" ")
+        # print(f"\n\t\t  Angular: {[round(v, 3) for v in values[1][16:]]}", end="")
+        print()
 

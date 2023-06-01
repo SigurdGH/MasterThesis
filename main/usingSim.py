@@ -58,9 +58,9 @@ def fromScenario(filename: str="", mode: int=0):
     runner.run(mode) # mode=0: disable ADSs; mode=1: enable ADSs
 
 
-def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc, modelName):
+def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc, collisions, modelName):
     x = [i for i in range(len(speeds))]
-
+    
     # print(len(s), len(a), len(j), len(p), duration, interval, len(dto))
     info = {
         "speed": speeds,
@@ -71,6 +71,7 @@ def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto,
         "interval": interval, 
         "dto": dto, 
         "ttc": ttc,
+        "col": collisions,
         "time": x
         }
     
@@ -493,8 +494,8 @@ class Simulation():
             * ttc: float, time (s) to collision
         """
         NO_COLLISION = 50
-        return distance_1 / ((distance_0-distance_1) / interval) if \
-            distance_0 > distance_1 and distance_0 - distance_1 < speed * 3 else NO_COLLISION
+        ttc = distance_1 / ((distance_0-distance_1) / interval) if distance_0 > distance_1 else NO_COLLISION
+        return ttc if ttc <= NO_COLLISION else NO_COLLISION # distance_0 - distance_1 < speed * 3 else NO_COLLISION
 
         ### Previous version
         # if distance >= 100:
@@ -562,6 +563,7 @@ class Simulation():
         angularZ = [0] # m/s
         timeRan = 0 # seconds
         lastCollision = -100 # seconds
+        collisions = [0]
         printingInfo = [("Time: ", " s"), ("TTC: ", " s"), ("DTO: ", " m"), ("JERK: ", " m/s^3"), ("Speed: ", " m/s")]
         
         # df = DataFrame(columns=["Attribute[TTC]", "Attribute[DTO]", "Attribute[Jerk]", "speed1", "speed2", "speed3", "speed4", "speed5", "speed6", "av1x", "av1y", "av1z", "av2x", "av2y", "av2z", "av3x", "av3y", "av3z", "av4x", "av4y", "av4z", "av5x", "av5y", "av5z", "av6x", "av6y", "av6z", "Predicted[COL]", "Attribute[COL]"]) 
@@ -642,6 +644,11 @@ class Simulation():
             # else:
             #     self.controls.steering = 0
 
+            ### Logs acutal collisions
+            actualCollision = 1 if self.actualCollisionTimeStamp > timeRan-updateInterval else 0
+            collisions.append(actualCollision)
+
+
             ### Starts the collision prediction
             if (timeRan//updateInterval >= pastImportance and useGeneratedData) or (len(speeds) > 5):
             # if len(speeds) > 2 // updateInterval:
@@ -652,7 +659,7 @@ class Simulation():
                             + angularX[-pastImportance:] + angularY[-pastImportance:] \
                                 + angularZ[-pastImportance:]
                     # print(row)
-                    predictions.append(predicter.predict(predicter.preProcess(row)))
+                    predictions.append(predicter.predict(predicter.preProcess(row))[0])
                 else:
                     row = [dtoList[-1], round(np.average(jerk[-(6*intsPerHalfSec)::intsPerHalfSec]), 3)] \
                         + speeds[-(6*intsPerHalfSec)::intsPerHalfSec] + \
@@ -661,12 +668,13 @@ class Simulation():
                                     angularZ[-(6*intsPerHalfSec)::intsPerHalfSec]
                     # print(row)
                     row = predicter.preProcess(row)[0]
-                    predictions.append(predicter.predict(row))
+                    predictions.append(predicter.predict(row)[0])
                     # predictions.append(predicter.predict(dto=dtoList[-1], 
                     #                                 jerk=round(np.average(jerk[-(6*intsPerHalfSec)::intsPerHalfSec]), 3), 
                     #                                 speeds=speeds[-(6*intsPerHalfSec)::intsPerHalfSec], 
                     #                                 angular=angular[-(6*intsPerHalfSec)::intsPerHalfSec]))
 
+                
                 if storePredictions:
                     # TODO Make it so the last x before an actual collision also is 1?
                     actualCollision = 1 if self.actualCollisionTimeStamp > timeRan-updateInterval else 0
@@ -696,25 +704,26 @@ class Simulation():
             self.writeParameters(paramsToStore, True)
 
         if plotting:
-            plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList, model)
+            plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList, collisions, model)
 
 
 if __name__ == "__main__":
     # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
     # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
-    sim.runSimulation(simDuration=20,
+    sim.runSimulation(simDuration=10,
                       updateInterval=0.5,
                       window=1.0,
                     #   model = "MLPClassifierWithGeneratedData",
                     #   model = "xgb_gen_30-9-11-27",
                     #   model = "xgb_gen_55-16-20-59",
                     #   model = "xgb_gen_80-15-37-65",
-                      model = "MLPClassifier_gen_PI4_RBC5_63-36-34-66",
+                    #   model = "MLPClassifier_gen_PI4_RBC5_63-36-34-66",
+                      model = "MLPClassifier_deep_577-16-29-188",
                     #   model="xgb_2_582-11-16-201", # NOTE må bruke ny modell
-                      runScenario=1,
+                      runScenario=0,
                       plotting=True,
                       storePredictions=False,
-                      useGeneratedData=True,
+                      useGeneratedData=False,
                       brakeOnCol=False)
     
