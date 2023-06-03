@@ -5,7 +5,6 @@ import lgsvl
 import matplotlib.pyplot as plt
 import numpy as np
 from copy import copy
-# from threading import Thread
 from time import time
 from pandas import DataFrame
 import math
@@ -23,27 +22,6 @@ from main.generateTestingData.useGeneratedData import NewPredicter
 # Seems like positions are wrong when loading files to the scenariorunner.
 # Possibly make something to transform the positions.
 # Could maybe use 'easting' and 'northing' to get precise locations from xml
-
-# TODO
-# * Maybe use absolute value in stead of average jerk
-
-
-# def on_collision(agent1, agent2, contact):
-#     """
-#     From deepscenario-toolset
-#     """
-#     name1 = agent1.__dict__.get('name')
-#     name2 = agent2.__dict__.get('name') if agent2 is not None else "OBSTACLE"
-#     print(f"{name1} collided with {name2} at {contact}")
-
-
-def on_custom(agent, kind, context):
-    # FRA GITHUB
-    print(f"Agent: {agent}")
-    print(f"Kind: {kind}")
-    print(f"Context: {context}")
-    if kind == "comfort":
-        print(f"Comfort sensor callback: {context}")
 
 
 def fromScenario(filename: str="", mode: int=0):
@@ -117,8 +95,11 @@ class Simulation():
     """
     def __init__(self, map: str="bg") -> None:
         self.env = Env()
-        self.sim = lgsvl.Simulator(self.env.str("LGSVL__SIMULATOR_HOST", lgsvl.wise.SimulatorSettings.simulator_host), self.env.int("LGSVL__SIMULATOR_PORT", lgsvl.wise.SimulatorSettings.simulator_port))
-        
+        self.sim = lgsvl.Simulator(
+                        self.env.str("LGSVL__SIMULATOR_HOST", 
+                        lgsvl.wise.SimulatorSettings.simulator_host), 
+                        self.env.int("LGSVL__SIMULATOR_PORT", lgsvl.wise.SimulatorSettings.simulator_port)
+                        )
         
         self.maps = {"sf": lgsvl.wise.DefaultAssets.map_sanfrancisco,
                      "bg": lgsvl.wise.DefaultAssets.map_borregasave,
@@ -136,10 +117,12 @@ class Simulation():
         # sp[0] += 120*lgsvl.utils.transform_to_forward(self.spawns[0])
         # self.state.transform = sp
         
-        self.ego = self.sim.add_agent(self.env.str("LGSVL__VEHICLE_0", lgsvl.wise.DefaultAssets.ego_lincoln2017mkz_apollo5), lgsvl.AgentType.EGO, self.state)
+        self.ego = self.sim.add_agent(
+                        self.env.str("LGSVL__VEHICLE_0", 
+                        lgsvl.wise.DefaultAssets.ego_lincoln2017mkz_apollo5), 
+                        lgsvl.AgentType.EGO, self.state)
         self.actualCollisionTimeStamp = -1
         self.ego.on_collision(self.on_ego_collision)
-        self.ego.on_custom(on_custom) # NOT WORKING
         
         self.controls = lgsvl.VehicleControl()
         
@@ -175,19 +158,6 @@ class Simulation():
                 self.sim.load(self.maps[map])
         except KeyError as e:
             print(f"This map does not exist in this program. Error: {e}")
-            
-
-            # if self.selectedMap == self.maps[map]:
-
-            # self.selectedMap = self.maps[map]
-        
-        # if map != "bg":
-        #     self.selectedMap = lgsvl.wise.DefaultAssets.map_sanfrancisco
-
-        # if self.sim.current_scene ==  self.selectedMap:
-        #     self.sim.reset()
-        # else:
-        #     self.sim.load(self.selectedMap)
 
 
     def changeTimeAndWeather(self, time: int=0, rain: float=0.0, fog: float=0.0, damage: float=0.0):
@@ -540,7 +510,6 @@ class Simulation():
                       brakeOnCol: bool=False):
         """
         Run a simulation in LGSVL (OSSDC-SIM).
-
         ### Params:
             * simDuration: float, time (seconds) for simulation duration
             * updateInterval: float, time (seconds) between each data logging
@@ -548,6 +517,7 @@ class Simulation():
             * model: str, which model the predicter class should use
             * runScenario: int, if 0, the car can be driven with the keyboard, otherwise a scenario
             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
+            * TODO
         """        
         ### Variables
         pastImportance = 4
@@ -573,7 +543,7 @@ class Simulation():
         # self.changeScenario("sunny_night")
         self.changeTimeAndWeather(6)
         if runScenario > 0:
-            print(f"starting simulation with scenario {runScenario}...")
+            print(f"Starting simulation with scenario {runScenario}...")
             self.useScenario(runScenario)
             # self.controls.throttle = 0.2
             # self.spawnNPCVehicle("Sedan", 30, 0.5, 10, True)
@@ -666,7 +636,6 @@ class Simulation():
                             angularX[-(6*intsPerHalfSec)::intsPerHalfSec] + \
                                 angularY[-(6*intsPerHalfSec)::intsPerHalfSec] + \
                                     angularZ[-(6*intsPerHalfSec)::intsPerHalfSec]
-                    # print(row)
                     row = predicter.preProcess(row)[0]
                     predictions.append(predicter.predict(row)[0])
                     # predictions.append(predicter.predict(dto=dtoList[-1], 
@@ -708,9 +677,7 @@ class Simulation():
 
 
 if __name__ == "__main__":
-    # file = "C:/MasterFiles/DeepScenario/deepscenario-dataset/greedy-strategy/reward-dto/road3-sunny_day-scenarios/0_scenario_8.deepscenario"
     sim = Simulation("sf")
-    # # sim.runSimulation(30, 1, 0.5, "Classifier", 5, False) # "xgb_2_582-11-16-201"
     sim.runSimulation(simDuration=20,
                       updateInterval=0.5,
                       window=1.0,
