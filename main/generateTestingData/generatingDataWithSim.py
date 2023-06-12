@@ -40,16 +40,16 @@ class GenerateData(Simulation):
         """
         print("Storing the generated data, ", end="")
         df = DataFrame(paramsToStore)
-        file = PATH+"/data/"+{filename}+".csv"
+        file = PATH+"/data/"+filename+".csv"
         if write:
             try:
                 oldDF = read_csv(file)
                 writeDF = concat([oldDF, df])
                 writeDF.to_csv(file, index=False)
-                print("added it to the file.")
+                print("Added it to the file.")
             except:
                 df.to_csv(file, index=False)
-                print("created a new file and added it there.")
+                print("Created a new file and added it there.")
 
 
     def generateDataWithSim(self, simDuration: float=10, updateInterval: float=1, window: float=0.5, filename: str="generatedData", storeData: bool=True):
@@ -81,6 +81,13 @@ class GenerateData(Simulation):
         metrics = ["s", "s", "m", "m/s^3", "m/s", "m/s", "m/s", "m/s", ""]
 
         self.changeTimeAndWeather(6)
+
+        ### Scenario 1
+        # self.useScenario(1)
+        # self.ego.apply_control(self.controls, True)
+        ### Scenario 2
+        self.spawnNPCVehicle("Sedan", 100, 0, 0, 10, False)
+    
 
         lidar = ReadLidar(window)
 
@@ -123,8 +130,8 @@ class GenerateData(Simulation):
 
 if __name__ == "__main__":
     sim = GenerateData("sf")
-    sim.spawnRandomNPCs(amountVehicles=20, amountPedestrians=10)
-    sim.generateDataWithSim(simDuration=900, updateInterval=0.5, window=1.0, filename="generatedData", storeData=False)
+    # sim.spawnRandomNPCs(amountVehicles=10, amountPedestrians=0)
+    sim.generateDataWithSim(simDuration=10, updateInterval=0.5, window=1.0, filename="forComparingScene2", storeData=True)
 
 
 

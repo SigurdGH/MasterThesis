@@ -20,7 +20,7 @@ class ReadLidar():
         self.vehicleHeight = 0.
         # NOTE the ground is around 2.3, but during breaking and accelerating the car is tilted
         # which makes the ground coordinates not constant
-        self.ground = -1.9 # Represents the lidar z-coordinate that corresponds approximately to the ground
+        self.ground = -2.0 # Represents the lidar z-coordinate that corresponds approximately to the ground
         self.window = window if window > 0 else 0.1
         self.rays = rays if rays < 32 else 32
         self.indexes = np.arange(360*rays)
@@ -33,23 +33,13 @@ class ReadLidar():
     
     def readPCD(self):
         """
-        Read and updates the point cloud object from a .pcd file and stores the point vectors.
+        Read and updates the point cloud object from a pcd-file and stores the point vectors.
         """
         try:
             pcd = o3d.io.read_point_cloud(self.filename)
             self.vectorList = np.asarray(pcd.points)
         except Exception as e:
             print(f"File is not found, error: {e}")
-
-
-    # def loadPointCloud(self):
-    #     """
-    #     Loads the point vectors into a pointCloud object.
-    #     """
-    #     if isinstance(self.vectorList, np.ndarray):
-    #         self.pointCloud.points = o3d.utility.Vector3dVector(self.vectorList)
-    #     else:
-    #         print("Need to load 'readPCD' beforehand!")
 
     
     @staticmethod
@@ -64,8 +54,9 @@ class ReadLidar():
         pointCloud = o3d.geometry.PointCloud()
         pointCloud.points = o3d.utility.Vector3dVector(vectorPointList)
         # l = [0,0,0], [0,0,-2.31], [1,0,-2.31], [2,0,-2.31], [3,0,-2.31], [4,0,-2.31], [5,0,-2.31], [6,0,-2.31], [7,0,-2.31], [8,0,-2.31], [9,0,-2.31], [10,0,-2.31], [11,0,-2.31], [12,0,-2.31], [13,0,-2.31], [14,0,-2.31], [15,0,-2.31]
+        # l = [0,0,0]
         # pointCloud.points = o3d.utility.Vector3dVector(np.vstack([l, vectorPointList]))
-        o3d.visualization.draw_geometries([pointCloud])
+        o3d.visualization.draw_geometries([pointCloud], width=1200, height=800, left=50, top=50)#, zoom=0.06, front=[-2., 0.4, -0.2], lookat=[5.9,0.8,-0.6], up=[0, 0, 90])
 
 
     def getPointsInFront(self):
@@ -80,7 +71,9 @@ class ReadLidar():
         # self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 0 and y > -self.window and y < self.window])
 
         # self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z < self.vehicleHeight])
-        self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z > self.ground and z < self.vehicleHeight])
+
+        # NOTE uses this one
+        self.inFront = np.array([(x, y, z) for (x, y, z) in self.vectorList[720:360*self.rays] if x > 2.86 and y > -self.window and y < self.window and z < self.vehicleHeight]) #  and z > self.ground])
 
 
     def getDistanceToObstacle(self):
@@ -182,19 +175,63 @@ class ReadLidar():
 
 
 if __name__ == "__main__":
-    lidar = ReadLidar(window=0, rays=20, filename="../data/lidar/lidar10mSedan.pcd")
-    lidar.readPCD()
+    filenames = [
+        "/data/lidarUpdate.pcd",
+        "/data/lidar/lidarNoCars.pcd",
+        "/data/lidar/lidar5mSedan.pcd",
+        "/data/lidar/lidar10mSedan.pcd", 
+        "/data/lidar/lidar20mSedan.pcd",
+        "/data/lidar/lidar40mSedan.pcd"
+        ]
+    lidar = ReadLidar(window=1, rays=35, filename=PATH + filenames[0],)
+    # lidar.readPCD()
+    print(f"DTO: {lidar.updatedDTO}")
 
-    lidar.getPointsInFront()
-    print(lidar.inFront)
-    lidar.vizualizePointCloud(lidar.inFront)
-    # lidar.vizualizePointCloud(lidar.vectorList)
-    closest = lidar.getDistanceToObstacle()
-    print(lidar.getDistanceToObstacle())#, np.sqrt(closest[0]**2+closest[1]**2))
+    # lidar.getPointsInFront()
+    # lidar.vizualizePointCloud(lidar.inFront)
+
+    lidar.vizualizePointCloud(lidar.vectorList)
+
+    # closest = lidar.getDistanceToObstacle()
+    # print(lidar.getDistanceToObstacle())#, np.sqrt(closest[0]**2+closest[1]**2))
     # print(lidar.closestPointInFront)
     # print(lidar.inFront)
-    print(lidar.updatedDTO)
+    
+
     # evasive = lidar.getEvasiveAction(10)
     # print(evasive)
 
-        
+    
+
+    # l = [0,0,0]
+    # points = lidar.vectorList[:720]
+    # # points = [0,0,0]
+
+
+    # NOTE used to make figures
+    # bredde = 1.
+    # for fn in filenames:
+    #     lidar = ReadLidar(window=1, rays=35, filename=PATH + fn)
+    #     lidar.readPCD()
+    #     inFront = np.array([(x, y, z) for (x, y, z) in lidar.vectorList[720:] if x > -2 and y > -bredde and y < bredde and z < 0])
+
+    #     pointCloud = o3d.geometry.PointCloud()
+    #     pointCloud.points = o3d.utility.Vector3dVector(inFront)
+    #     o3d.visualization.draw_geometries([pointCloud], 
+    #                                     window_name='Open3D',
+    #                                     width=1200,
+    #                                     height=800,
+    #                                     left=50,
+    #                                     top=50,
+    #                                     point_show_normal=False,
+    #                                     mesh_show_wireframe=False,
+    #                                     mesh_show_back_face=False,
+    #                                     # zoom=0.06, # For a nice view from behind
+    #                                     # front=[-2., 0.4, -0.2],
+    #                                     # lookat=[5.9,0.8,-0.6],
+    #                                     # up=[0, 0, 90]
+    #                                     zoom=0.7, # Top down
+    #                                     front=[0.1, 0, 8],
+    #                                     lookat=[0.1,0,0],
+    #                                     up=[10, 0, 0]
+    #                                     )

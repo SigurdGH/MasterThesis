@@ -24,19 +24,19 @@ from main.generateTestingData.useGeneratedData import NewPredicter
 # Could maybe use 'easting' and 'northing' to get precise locations from xml
 
 
-def fromScenario(filename: str="", mode: int=0):
-    """
-    Run a scenario from a scenariofile.
+# def fromScenario(filename: str="", mode: int=0):
+#     """
+#     Run a scenario from a scenariofile.
 
-    From github: https://github.com/Simula-COMPLEX/DeepScenario/tree/main/deepscenario-toolset#requirements
-    """
-    runner = lgsvl.scenariotoolset.ScenarioRunner()
-    runner.load_scenario_file(scenario_filepath_or_buffer=filename)
-    runner.connect_simulator_ads(simulator_port=8181, bridge_port=9090)
-    runner.run(mode) # mode=0: disable ADSs; mode=1: enable ADSs
+#     From github: https://github.com/Simula-COMPLEX/DeepScenario/tree/main/deepscenario-toolset#requirements
+#     """
+#     runner = lgsvl.scenariotoolset.ScenarioRunner()
+#     runner.load_scenario_file(scenario_filepath_or_buffer=filename)
+#     runner.connect_simulator_ads(simulator_port=8181, bridge_port=9090)
+#     runner.run(mode) # mode=0: disable ADSs; mode=1: enable ADSs
 
 
-def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc, collisions, modelName):
+def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto, ttc, collisions, modelName, scenario):
     x = [i for i in range(len(speeds))]
 
     # print(len(s), len(a), len(j), len(p), duration, interval, len(dto))
@@ -45,16 +45,15 @@ def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto,
         "accelerations" : accelerations,
         "jerks": jerks, 
         "predictions": predictions, 
-        "duration": duration, 
-        "interval": interval, 
         "dto": dto, 
         "ttc": ttc,
         "col": collisions,
-        "time": x
+        "time": x,
+        "duration": duration, 
+        "interval": interval
         }
-    
     df = DataFrame(info)
-    df.to_csv(PATH + "/data/fromUsingSim/" + modelName + ".csv", index=False)
+    df.to_csv(PATH + "/data/fromUsingSim/" + modelName + "_s" + str(scenario) + ".csv", index=False)
 
     plt.figure(figsize=(12, 5))
 
@@ -76,9 +75,7 @@ def plotData(speeds, accelerations, jerks, predictions, duration, interval, dto,
     plt.xlabel(f"Time, delta = {interval} s, duration = {duration} s")
     plt.legend()
     plt.grid()
-    plt.title("Speed, DTO and collision prediction")
-
-    # TODO plot med col, pred col, accelation ++
+    plt.title(f"Speed, DTO and collision prediction\nScenario {scenario}")
 
     plt.show()
 
@@ -129,6 +126,7 @@ class Simulation():
         self.previousCrash = None
         self.otherAgents = []
         self.distanceToObjects = []
+        self.throttle = 0
 
 
     def on_ego_collision(self, agent1, agent2, contact):
@@ -250,7 +248,7 @@ class Simulation():
         The ego vehicle is going to crash into it after some seconds.
 
         """
-        print(f"Running scene number {scene}!")
+        # print(f"Running scene number {scene}!")
         forward = lgsvl.utils.transform_to_forward(self.spawns[0])
         right = lgsvl.utils.transform_to_right(self.spawns[0])
         rot = self.spawns[0].rotation
@@ -291,6 +289,26 @@ class Simulation():
             waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot, idle=i) for f, r, i in directions])
             runWithWaypoints(waypointsList)
             self.controls.throttle = 0.4
+        elif scene == 6: # Car driving in front with constant speed
+            self.spawnNPCVehicle("Sedan", 20, 0, 0, 8, True)
+            directions = [(150, 0)]
+            waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot) for f, r in directions])
+            runWithWaypoints(waypointsList)
+            self.controls.throttle = 0.5
+        elif scene == 7: # Car driving towards ego
+            self.spawnNPCVehicle("Sedan", 100, 0.5, 180, 12, True)
+            directions = [(100, 0), (0, 0)]
+            waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot) for f, r in directions])
+            runWithWaypoints(waypointsList)
+            self.controls.throttle = 0.4
+        elif scene == 8: # Car stopped 100 m in front
+            self.spawnNPCVehicle("Sedan", 100, 0.5, 0, 0, False)
+            # directions = [(100, 0), (0, 0)]
+            # waypointsList.append([lgsvl.DriveWaypoint(position=self.spawns[0].position + f * forward + r * right, speed=5, angle=rot) for f, r in directions])
+            # runWithWaypoints(waypointsList)
+            self.controls.throttle = 0.6
+
+        self.throttle = self.controls.throttle
 
         # elif scnene == ... # With pedestrians
         #     self.otherAgents.append(self.sim.add_agent("Bob", lgsvl.AgentType.PEDESTRIAN))
@@ -321,7 +339,7 @@ class Simulation():
         # self.otherAgents[0].change_lane(False)
 
 
-    def isColliding(self, lastCollision: float=0.0, now: float=0.0, brakeOnCol: bool=False):
+    def isColliding(self, lastCollision: float=0.0, now: float=0.0, brakeOnCol: bool=False, scenario: int=0, evasive: int=0):
         """
         Turns on warning hazards for 2 seconds when a crash is predicted and applies the brakes.
 
@@ -331,18 +349,28 @@ class Simulation():
 
         self.isColliding(lastCollision, timeRan, predictions[-1], predictions[-2])
         """
-        if now-lastCollision > 4:
-            self.controls.braking = 0
-            self.controls.turn_signal_left = False
-            self.controls.turn_signal_right = False
-            if brakeOnCol:
-                self.ego.apply_control(self.controls, False)
-        else:
-            self.controls.braking = 1
+        if now-lastCollision <= 4:
             self.controls.turn_signal_left = True
             self.controls.turn_signal_right = True
+            if evasive != 0:
+                self.controls.steering = -evasive/4
+                self.controls.braking = 1
             if brakeOnCol:
+                self.controls.braking = 1
+                self.controls.throttle = 0
                 self.ego.apply_control(self.controls, True)
+        else:
+            self.controls.turn_signal_left = False
+            self.controls.turn_signal_right = False
+            if evasive == 0:
+                self.controls.steering = 0
+                self.controls.braking = 0
+            if brakeOnCol:
+                self.controls.braking = 0
+                self.controls.throttle = self.throttle
+                self.ego.apply_control(self.controls, bool(scenario))
+
+        
 
 
     def getDTOsFromCoordinates(self):
@@ -428,7 +456,7 @@ class Simulation():
         registering a closer obstacle.
         
         ### Current formula
-            * t_ttc = d_1 / ((d_0 - d_1) / t)
+            * t_ttc = t * d_1 / (d_0 - d_1)
         
         ### Params:
             * distance_0: float, distance (m) to the object one "interval" ago
@@ -464,7 +492,7 @@ class Simulation():
             * ttc: float, time (s) to collision
         """
         NO_COLLISION = 50
-        ttc = distance_1 / ((distance_0-distance_1) / interval) if distance_0 > distance_1 else NO_COLLISION
+        ttc =  interval * distance_1 / (distance_0-distance_1) if distance_0 > distance_1 else NO_COLLISION
         return ttc if ttc <= NO_COLLISION else NO_COLLISION # distance_0 - distance_1 < speed * 3 else NO_COLLISION
 
         ### Previous version
@@ -503,7 +531,7 @@ class Simulation():
                       updateInterval: float=0.5, 
                       window: float=0.5, 
                       model: str="Classifier", 
-                      runScenario: int=0, 
+                      scenario: int=0, 
                       plotting: bool=True, 
                       storePredictions: bool = False,
                       useGeneratedData: bool=True,
@@ -515,18 +543,18 @@ class Simulation():
             * updateInterval: float, time (seconds) between each data logging
             * window: float, distance (meters) left/right the algorithm should look for obstacles
             * model: str, which model the predicter class should use
-            * runScenario: int, if 0, the car can be driven with the keyboard, otherwise a scenario
+            * scenario: int, if 0, the car can be driven with the keyboard, otherwise a scenario
             * plotting: bool, plot speed, acceleration, jerk, predictions and DTO after the simulation
             * TODO
         """        
         ### Variables
-        pastImportance = 4
+        pastImportance = int(model[model.find("PI")+2]) if not model[model.find("PI")+2].isalpha() else 4 # Looks for "PI" inside the model name, if not found, returns 4
         ttcList = [50] # seconds
         dtoList = [100] # meters
         speeds = [0] # m/s
         acceleration = [0] # m/s^2
         jerk = [0] # m/s^3
-        predictions = [0] * int(5) # bool, 0 or 1
+        predictions = None # is changed to list consisting of 0 or 1
         angular = [[0,0,0]]  # m/s, m/s, m/s
         angularX = [0] # m/s
         angularY = [0] # m/s
@@ -542,9 +570,9 @@ class Simulation():
         ### Scenarios
         # self.changeScenario("sunny_night")
         self.changeTimeAndWeather(6)
-        if runScenario > 0:
-            print(f"Starting simulation with scenario {runScenario}...")
-            self.useScenario(runScenario)
+        if scenario > 0:
+            print(f"Starting simulation with scenario {scenario}...")
+            self.useScenario(scenario)
             # self.controls.throttle = 0.2
             # self.spawnNPCVehicle("Sedan", 30, 0.5, 10, True)
         else:
@@ -552,13 +580,15 @@ class Simulation():
             self.spawnNPCVehicle("Sedan", 10, 0, 0, 10, True)
         
         ### Classes
-        # pred = P(model) # Import predictor and load model with new predicts?
         if useGeneratedData:
             predicter = NewPredicter.loadModel(model)
-            predictions = [0] * 4
+            predictions = [0] * pastImportance
         else:
             predicter = Predicter() 
             predicter.loadModel(model)
+            predictions = [0] * int(5)
+        print(f"Predicting with {model}.")
+
         lidar = ReadLidar(window, 35)
 
         intsPerHalfSec = int(0.5//updateInterval) # NOTE this might not work as intended with updateInterval != 0.5
@@ -571,6 +601,7 @@ class Simulation():
             self.sim.run(updateInterval) # NOTE can speed up the virtual time in the simulator
             timeRan += updateInterval
             self.ego.get_sensors()[2].save(PATH + "/data/lidarUpdate.pcd")
+            # print(self.ego.get_sensors()[2].__dict__)
             dtoList.append(lidar.updatedDTO)
             # Maybe use this to check distances in comparison with the lidar
             # self.getDTOs()
@@ -603,16 +634,6 @@ class Simulation():
             else:
                 print()
             # print(f"TTC: {round(ttcList[-1], 2)} s \t DTO: {round(dtoList[-1], 2)} Jerk: {round(np.average(jerk[-(6):]), 2)} m/s^3\t Speed: {round(self.ego.state.speed, 3)} m/s \t Time: {round(self.sim.current_time, 1)} s")
-
-            ### Evasive action
-            # if dtoList[-1] < 15:
-            #     evasive = lidar.getEvasiveAction()
-            #     evasiveDict = {1: "LEFT", -1: "RIGHT"}
-            #     print(f"Turn {evasiveDict[evasive]} to avoid a potential collision!")
-            #     self.controls.steering = -evasive/4
-            #     self.controls.braking = 1
-            # else:
-            #     self.controls.steering = 0
 
             ### Logs acutal collisions
             actualCollision = 1 if self.actualCollisionTimeStamp > timeRan-updateInterval else 0
@@ -657,15 +678,15 @@ class Simulation():
                 lastCollision = timeRan
 
             ### Turns on hazards and applies the brakes
-            self.isColliding(lastCollision, timeRan, (runScenario == 0 and brakeOnCol))
+            self.isColliding(lastCollision, timeRan, brakeOnCol, scenario)#, evasive=lidar.getEvasiveAction())
             # self.controls.braking = 1 if predictions[-1] or predictions[-2] or predictions[-3] else 0
 
             ### Only applies new controls if something has changed
-            if self.controls.__dict__ != oldControls and bool(runScenario):
+            if self.controls.__dict__ != oldControls and bool(scenario):
                 oldControls = copy(self.controls.__dict__)
                 self.ego.apply_control(self.controls, True)
 
-            if timeRan > simDuration:
+            if timeRan >= simDuration:
                 self.sim.stop()
                 break
 
@@ -673,26 +694,33 @@ class Simulation():
             self.writeParameters(paramsToStore, True)
 
         if plotting:
-            plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList, collisions, model)
+            plotData(speeds, acceleration, jerk, predictions, simDuration, updateInterval, dtoList, ttcList, collisions, model, scenario)
 
 
 if __name__ == "__main__":
+
+    modelsDeep = [
+        "MLPClassifier_deep_572-21-27-190",
+        "RandomForestClassifier_deep_580-13-27-190",
+        "SVC_deep_581-12-72-145",
+        "XGBClassifier_deep_578-15-21-196"
+    ]
+
+    modelsGen = [
+        "MLPClassifier_gen_PI4_RBC5_75-34-22-68",
+        "RandomForestClassifier_gen_PI4_RBC5_82-34-15-68",
+        "SVC_gen_PI4_RBC5_82-38-15-64",
+        "XGBClassifier_gen_PI4_RBC5_82-15-27-75"
+    ]
+
     sim = Simulation("sf")
-    sim.runSimulation(simDuration=20,
+    sim.runSimulation(simDuration=12,
                       updateInterval=0.5,
                       window=1.0,
-                    #   model = "MLPClassifier_deep_577-16-29-188",
-                    #   model = "RandomForestClassifier_deep_583-10-28-189",
-                    #   model = "SVC_deep_582-11-70-147",
-                    #   model = "XGBClassifier_deep_582-11-16-201",
-                    #   model = "XGBClassifier_gen_PI4_RBC5_74-23-32-70",
-                    #   model = "RandomForestClassifier_gen_PI4_RBC5_76-37-21-65",
-                    #   model = "SVC_gen_PI4_RBC5_75-35-22-67",
-                    #   model = "MLPClassifier_gen_PI4_RBC5_63-36-34-66",
-                      model = "RandomForestClassifier_gen_29-12-9-41",
-                      runScenario=1,
+                      model = modelsGen[3],
+                      scenario=6,
                       plotting=True,
                       storePredictions=False,
                       useGeneratedData=True,
-                      brakeOnCol=False)
+                      brakeOnCol=True)
     

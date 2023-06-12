@@ -9,13 +9,13 @@ from main.ML.Model import Predicter
 
 def printSols(solutions):
     numberOfEach = 4
-    colsToUse = ["TTCs", "DTOs", "JERKs", "Speeds"] #, "asX", "asY", "asZ"]
+    colsToUse = ["TTCs", "DTOs",  "Speeds"] #, "JERKs","asX", "asY", "asZ"]
     print()
     for values in solutions:
         print(f"Score: {round(values[0], 3)}".ljust(17), end=" ")
         for i in range(0, 16, 4):
             if (i) % 4 == 0:
-                s = colsToUse[(i) // 4]
+                s = colsToUse[(i) // len(colsToUse)]
             vals = [round(v, 3) for v in values[1][i:i+numberOfEach]]
             print(f"{s}: {vals}".ljust(40), end=" ")
         # print(f"\n\t\t  Angular: {[round(v, 3) for v in values[1][16:]]}", end="")

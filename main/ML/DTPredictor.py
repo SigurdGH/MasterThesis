@@ -35,7 +35,7 @@ class DTPredictor():
             for c in x.columns:
                 if x[c].dtype != float:
                     x = x.drop(c, axis=1)
-            x.loc[x["Attribute[DTO]"]==100000, "Attribute[DTO]"] = -1
+            x.loc[x["Attribute[DTO]"]>100, "Attribute[DTO]"] = 100
             x = x.to_numpy()
 
             if not self._fitScaler: # Only fit the scaler once (on training data)

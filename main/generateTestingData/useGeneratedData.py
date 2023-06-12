@@ -22,11 +22,10 @@ def makeDataUsable(df: DataFrame, pastImportance: int=4, rowsBeforeCol: int=5, r
     """
     Make a usable Dataframe from a csv file from generated data.\\
     Creates pastImportance of columns for each prediction feature.\\
-    Registers the "col" feature before an actual collision as 1, up to secBeforeCol back in time.\\
-    If undersampleRatio is > 0, it will under sample the data, if it is 0, it will not.
+    Registers the "col" feature before an actual collision as 1, up to rowsBeforeCol back in time.
     
     ### Params:
-        * df: Dataframe, need to have the columns named "TTC", "DTO", "JERK" and "Speed"
+        * df: Dataframe, need to have the columns named "TTC", "DTO", "JERK", "Speed", "asX", "asY", "asZ" and "COL"
         * pastImportance: int, needs to be > 0
         * rowsBeforeCol: int, needs to be > 0
         * removeCol: bool, True if the origianl collision row should be removed
@@ -127,19 +126,8 @@ class NewPredicter(Predicter):
         Returns:
             x: np.array
         """
-        # print("Nye preProcess")
         if isinstance(x, DataFrame):
-            # print("er dataframe")
-            # label encode road and scenario
-            # x = self.labelEncode(x)
-
-            # only accepts numeric values in training as of now
-            # for c in x.columns:
-            #     if x[c].dtype != float:
-            #         x = x.drop(c, axis=1)
             self.numberOfFeatures = len(x.columns)
-            # x.loc[x["Attribute[TTC]"]==100000, "Attribute[TTC]"] = -1 # NOTE May be transformed to something else
-            # x.loc[x["Attribute[DTO]"]==100000, "Attribute[DTO]"] = -1
             x = x.to_numpy()
             if not self._fitScaler: # Only fit the scaler once (on training data)
                 print("Scaler is fitted")
@@ -148,17 +136,10 @@ class NewPredicter(Predicter):
             x = self.scaler.transform(x) # Scaling the data
             return x
 
-        # elif isinstance(x, list or np.ndarray or Series): # Used when predicting one input at a time
         if not self._fitScaler:
             print("The scaler is not fitted!")
             return None
-        # print("Gjør om tester")
-        # NOTE Need to make this only accept one row: [[x,x,x,x,x,x]]
-        # Also maybe check if nested and the input has the correct amount of features
-        # if len(x) == self.numberOfFeatures:
-        # print(type(x))
         x = self.scaler.transform([x])
-        # print(type(x))
         return x
 
 
@@ -177,19 +158,6 @@ class NewPredicter(Predicter):
             ...
 
         """
-        # if len(x) != self.numberOfFeatures:
-        #     print(f"Wrong amount of features!, got {len(x)}, need to have {self.numberOfFeatures}")
-        #     return None
-        
-        # x = np.array([20, 20, 1, 2, 1,1,2,3,4,5,6])
-        # if len(angular) < 6:
-        #     x = [ttc, dto, jerk] + speeds
-        # else:
-        #     x = [dto, jerk] + speeds + np.array(angular).flatten().tolist()
-        # print(f"Inne i predict: {x}")
-        # xProcessed = self.preProcess(x)
-        # print(f"x: {x}\t\tprocessed: {xProcessed}")
-        # prediction = self.predict(xProcessed)[0]
         prediction = self.model.predict(x)
         return prediction
 
