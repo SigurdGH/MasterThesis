@@ -78,7 +78,7 @@ class DataManipulation():
         if isinstance(self.data, pd.DataFrame):
             self._data = self.data.merge(xmlDf, how="inner", on=["ScenarioID", "road", "reward", "scenario", "strategy"], copy=False)
             self.ExtractAvData()
-            self.UpdateSpeedAtCollision()
+            # self.UpdateSpeedAtCollision()
         else:
             print("Something went wrong in 'addFromXML()'!")
 
