@@ -36,32 +36,35 @@ class DataManipulation():
         random.seed(1)
         res = self._data.copy()
 
-        # for each row, get the SAC value, and the speed columns that the SAC value falls in between 
-        # and update the following speed columns with a random value between 0 and the speed value
         SAC = "Attribute[SAC]"
         speeds = [f"speed{i}" for i in range(1,7)]
-
         for idx, row in self._data.loc[self._data["Attribute[COL]"] == True].iterrows():
-            _sac = row[SAC]
-            for speed_idx, speed in enumerate(speeds):
-                if speed_idx + 1 == len(speeds):
-                    break
-                if _sac >= row[speed] and _sac <= row[speeds[speed_idx+1]]:
-                    prev = res.loc[idx, speeds[speed_idx:]].values.tolist()
-                    res.loc[idx, speeds] = [prev[0] + random.uniform(-1, row[speed] / 10) for _ in range(0, len(speeds)- len(prev))] + prev
-                    break
-        
-        inc_fac = 1.2
-        # increase all speed columns by 10% (where collision occured)
-        res.loc[res["Attribute[COL]"] == True, speeds] = res.loc[res["Attribute[COL]"] == True, speeds].values * inc_fac
-        
-        # we will also increase the Attribute[DTO] by 10% (where collision occured)
-        # res.loc[res["Attribute[COL]"] == True, "Attribute[DTO]"] = res.loc[res["Attribute[COL]"] == True, "Attribute[DTO]"].values * inc_fac
 
-        distance_inc = 3
-        # we also need to make sure that the Attribute[DTO] is at least 3 meters. So if it is less than 3, we will increase it by 3 + random.uniform(0, 1) + original value
-        condition = (res["Attribute[DTO]"] <= 10) #& (res["speed6"] >= 10)
-        res.loc[condition, "Attribute[DTO]"] = res.loc[condition, "Attribute[DTO]"].values + distance_inc + random.uniform(0, 1)
+            _sac = row[SAC]
+            if row[speeds[-1]] - _sac > 0:
+                continue
+
+            for speed_idx, speed in enumerate(speeds[::-1]):
+                if len(speeds) - speed_idx == 0:
+                    break
+
+                if row[speed] - _sac < 0:
+                    continue
+
+                speed_to_keep = res.loc[idx, speeds[:len(speeds) - speed_idx]].values.tolist().copy()
+                speed_new = []
+                last_speed = speed_to_keep[0]
+                for i in range(len(speeds) - len(speed_to_keep)):
+                    calculated_speed = last_speed + random.uniform(-1, row[speed] / 10)
+                    if calculated_speed < 0:
+                        calculated_speed = last_speed
+                    speed_new.append(calculated_speed)
+                    last_speed = speed_new[-1]
+
+                res.loc[idx, speeds] = speed_new + speed_to_keep
+
+                # res.loc[idx, "updated_at"] = "-".join(speeds[:len(speeds) - speed_idx]) # TODO - remove this
+                break
         self._data = res
 
     def addFromXML(self, filename: str="") -> None:
@@ -78,7 +81,7 @@ class DataManipulation():
         if isinstance(self.data, pd.DataFrame):
             self._data = self.data.merge(xmlDf, how="inner", on=["ScenarioID", "road", "reward", "scenario", "strategy"], copy=False)
             self.ExtractAvData()
-            # self.UpdateSpeedAtCollision()
+            self.UpdateSpeedAtCollision()
         else:
             print("Something went wrong in 'addFromXML()'!")
 
