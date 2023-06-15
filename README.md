@@ -4,9 +4,9 @@ This repository contains the files needed to create and use the digital twins fo
 ## Instructions
 To be able to run the different files, the requirements in "requirements.txt" needs to be satisfied.
 
-If a file that is running the simualor is used, the instructions found here (https://www.svlsimulator.com/docs/python-api/python-api/#requirements) must be followed.
+If a file that is running the simualor is used, the instructions found [here](https://www.svlsimulator.com/docs/python-api/python-api/#requirements) must be followed.
 
-The simulator itself can be downloaded from OSSDC here (https://github.com/OSSDC/OSSDC-SIM/releases/tag/v1.2).
+The simulator itself can be downloaded from OSSDC [here](https://github.com/OSSDC/OSSDC-SIM/releases/tag/v1.2).
 
 ## Main files
 * [digital-twin.generated.ipynb](https://github.com/SigurdGH/MasterThesis/blob/main/main/digital-twin.generated.ipynb) and [digital-twin.ipynb](https://github.com/SigurdGH/MasterThesis/blob/main/main/digital-twin.ipynb)
