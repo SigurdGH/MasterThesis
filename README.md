@@ -1,11 +1,28 @@
-# MasterThesis
-Code for master thesis
+# Master's Thesis Repository
+This repository contains the files needed to create and use the digital twins for our master's thesis.
 
+## Instructions
+To be able to run the different files, the requirements in "requirements.txt" needs to be satisfied.
 
+If a file that is running the simualor is used, the instructions found here (https://www.svlsimulator.com/docs/python-api/python-api/#requirements) must be followed.
 
+The simulator itself can be downloaded from OSSDC here (https://github.com/OSSDC/OSSDC-SIM/releases/tag/v1.2).
 
+## Main files
+* [digital-twin.generated.ipynb](https://github.com/SigurdGH/MasterThesis/blob/main/main/digital-twin.generated.ipynb) and [digital-twin.ipynb](https://github.com/SigurdGH/MasterThesis/blob/main/main/digital-twin.ipynb)
+    * For creating the digital twin classifiers
+* [UsingSim.py](https://github.com/SigurdGH/MasterThesis/blob/main/main/usingSim.py)
+    * For running the simulator together with the digital twin
+* [evaluatingGA.ipynb](https://github.com/SigurdGH/MasterThesis/blob/main/main/evaluatingGA.ipynb)
+    * For evaluating the genetic algorithm
+* [evaluatingGA.ipynb](https://github.com/SigurdGH/MasterThesis/blob/main/main/evaluatingGA.ipynb)
+    * For evaluating the genetic algorithm
+* [generatingDataWithSim.py](https://github.com/SigurdGH/MasterThesis/blob/main/main/generateTestingData/generatingDataWithSim.py)
+    * For creating more data that the models can use for training
+* [useGeneratedData.py](https://github.com/SigurdGH/MasterThesis/blob/main/main/generateTestingData/useGeneratedData.py)
+    * For using the created data and creating models with self-generated data
 
-Running with different models:
+## Results from different models:
 
 - DeepScenario based models:
     - MLP: MLPClassifier_deep_577-16-29-188 =>
